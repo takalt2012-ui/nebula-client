@@ -1,0 +1,6 @@
+The procedural sunset background in src/scene.rs adapts the palette and rendering
+approach from Horizon Launcher, launcher/src/scene.rs.
+
+Copyright (c) 2026 Ludovic Marie and the Horizon contributors.
+Used under the MIT License. The complete license text is in horizon-source/LICENSE
+in the local source checkout.
