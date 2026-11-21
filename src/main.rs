@@ -44,15 +44,17 @@ const HUD_FEATURE_LABELS: [(&str, &str); 14] = [
 enum Page {
     Play,
     Performance,
+    Graphics,
     Shaders,
     Diagnostics,
     Settings,
 }
 
 impl Page {
-    const ALL: [(Self, &'static str); 5] = [
+    const ALL: [(Self, &'static str); 6] = [
         (Self::Play, "Home"),
         (Self::Performance, "Performance"),
+        (Self::Graphics, "Graphics"),
         (Self::Shaders, "Shaders"),
         (Self::Diagnostics, "Diagnostics"),
         (Self::Settings, "Settings"),
@@ -176,6 +178,10 @@ struct NebulaClient {
     shader_picked: String,
     shader_dir: Option<PathBuf>,
     shader_graphics: Option<PathBuf>,
+    /// Leaf, transparency and culling settings read from the selected instance.
+    gfx: Option<GfxSettings>,
+    /// `options.txt` and `horizon-graphics.txt` of the selected instance.
+    gfx_paths: Option<(PathBuf, PathBuf)>,
 }
 
 impl NebulaClient {
@@ -202,6 +208,8 @@ impl NebulaClient {
             shader_picked: String::new(),
             shader_dir: None,
             shader_graphics: None,
+            gfx: None,
+            gfx_paths: None,
         };
         app.refresh();
         app
@@ -303,6 +311,8 @@ impl NebulaClient {
         self.shader_picked.clear();
         self.shader_dir = None;
         self.shader_graphics = None;
+        self.gfx = None;
+        self.gfx_paths = None;
         let (Some(version), Some(launcher)) = (self.selected_version(), self.official_launcher.as_deref()) else { return; };
         let Some(tag) = version.root.file_name().and_then(|name| name.to_str()) else { return; };
         let Ok(instance) = selected_instance(launcher, tag) else { return; };
@@ -313,6 +323,46 @@ impl NebulaClient {
         self.shader_packs = scan_shader_packs(&shader_dir);
         self.shader_graphics = Some(graphics);
         self.shader_dir = Some(shader_dir);
+        self.load_graphics_state(&instance_root);
+    }
+
+    fn load_graphics_state(&mut self, instance_root: &Path) {
+        let options = instance_root.join("options.txt");
+        let graphics = instance_root.join("horizon-graphics.txt");
+        self.gfx = Some(GfxSettings::read(&options, &graphics));
+        self.gfx_paths = Some((options, graphics));
+    }
+
+    /// Switches page. Graphics re-reads the files so values changed in-game are not stale.
+    fn go_to(&mut self, page: Page) {
+        if page == Page::Graphics && self.page != Page::Graphics {
+            self.reload_gfx();
+        }
+        self.page = page;
+    }
+
+    fn reload_gfx(&mut self) {
+        if let Some((options, graphics)) = self.gfx_paths.clone() {
+            self.gfx = Some(GfxSettings::read(&options, &graphics));
+        }
+    }
+
+    /// Writes one setting to `options.txt` or `horizon-graphics.txt`. Reports failure in the status line.
+    fn write_gfx(&mut self, in_options: bool, key: &str, value: &str) -> bool {
+        let Some((options, graphics)) = self.gfx_paths.clone() else { return false; };
+        let result = if in_options {
+            write_setting(&options, key, value)
+        } else {
+            // A hand-changed graphics key no longer matches a named preset.
+            write_setting(&graphics, key, value).and_then(|_| write_setting(&graphics, "preset", "custom"))
+        };
+        match result {
+            Ok(()) => true,
+            Err(error) => {
+                self.status = Some(Status { message: format!("Could not save {key}: {error}"), error: true });
+                false
+            }
+        }
     }
 
     /// Writes `pickedShaderPack:` in `horizon-graphics.txt`, leaving every other line untouched.
@@ -572,7 +622,7 @@ impl NebulaClient {
                 ui.spacing_mut().item_spacing.y = 6.0;
                 for (page, label) in Page::ALL {
                     if nav_item(ui, page, label, self.page == page, compact).clicked() {
-                        self.page = page;
+                        self.go_to(page);
                     }
                 }
                 ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
@@ -776,6 +826,189 @@ impl NebulaClient {
                 );
             }
         });
+        self.status_line(ui);
+    }
+
+    fn graphics_page(&mut self, ui: &mut egui::Ui) {
+        page_header(
+            ui,
+            "GRAPHICS",
+            "Leaves & Smoothness",
+            "Written to the selected instance's settings files. Close the game first: Horizon rewrites them when it exits.",
+        );
+        let Some(mut gfx) = self.gfx.clone() else {
+            ui.label(
+                RichText::new(
+                    "No Horizon instance is selected, so these settings cannot be loaded. Choose a build on Home, then refresh.",
+                )
+                .color(MUTED),
+            );
+            return;
+        };
+        let locked = game_is_running();
+        if locked {
+            ui.label(RichText::new("Horizon is running. Close it to change these settings.").color(CORAL));
+            ui.add_space(6.0);
+        }
+
+        let mut changes: Vec<GfxChange> = Vec::new();
+        let culling_modes = [("off", "Off"), ("sync", "Synchronous"), ("async", "Asynchronous")];
+        ui.add_enabled_ui(!locked, |ui| {
+            glass_card(ui, inner_card(false), |ui| {
+                ui.label(RichText::new("QUICK SETUPS").size(11.0).strong().color(CORAL));
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(
+                        "Smooth, same look turns on Horizon's culling options, which skip drawing what you cannot see. Plain rendering returns them to Horizon's defaults. Neither touches leaf transparency.",
+                    )
+                    .small()
+                    .color(MUTED),
+                );
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if accent_button(ui, "Smooth, same look").clicked() {
+                        changes.extend(gfx.apply_smooth_same_look());
+                    }
+                    if accent_button(ui, "Plain rendering").clicked() {
+                        changes.extend(gfx.apply_plain_rendering());
+                    }
+                });
+            });
+            ui.add_space(12.0);
+
+            glass_card(ui, inner_card(false), |ui| {
+                ui.label(RichText::new("LEAVES").size(11.0).strong().color(CORAL));
+                ui.add_space(4.0);
+                if setting_row(
+                    ui,
+                    &mut gfx.cutout_leaves,
+                    "Leaf transparency",
+                    "See-through gaps in leaves instead of solid blocks. On is Horizon's default.",
+                    true,
+                ) {
+                    changes.push((true, "cutoutLeaves", gfx.cutout_leaves.to_string()));
+                }
+                if setting_row(
+                    ui,
+                    &mut gfx.improved_transparency,
+                    "Improved transparency",
+                    "Cleaner blending for glass, water and other translucent blocks. Can cost GPU time.",
+                    true,
+                ) {
+                    changes.push((true, "improvedTransparency", gfx.improved_transparency.to_string()));
+                }
+                if let Some(value) = choice_row(
+                    ui,
+                    "Leaf culling",
+                    "Skips leaf faces you cannot see. Hidden faces keeps a tree crown looking the same from outside. Solid and Solid+ draw inner leaves opaque, which reduces see-through and makes canopies look chunkier.",
+                    &[
+                        ("off", "Off"),
+                        ("hidden", "Hidden faces"),
+                        ("hollow", "Hollow"),
+                        ("solid", "Solid"),
+                        ("solid_aggressive", "Solid+"),
+                    ],
+                    &gfx.leaf_culling,
+                ) {
+                    gfx.leaf_culling = value.clone();
+                    changes.push((false, "leafCulling", value));
+                }
+            });
+            ui.add_space(12.0);
+
+            glass_card(ui, inner_card(false), |ui| {
+                ui.label(RichText::new("SMOOTHNESS").size(11.0).strong().color(CORAL));
+                ui.add_space(4.0);
+                if setting_row(
+                    ui,
+                    &mut gfx.cave_culling,
+                    "Cave culling",
+                    "Skips terrain hidden behind rock. On is Horizon's default.",
+                    true,
+                ) {
+                    changes.push((false, "caveCulling", gfx.cave_culling.to_string()));
+                }
+                if let Some(value) = choice_row(
+                    ui,
+                    "Entity culling",
+                    "Hides mobs and items that are out of sight. Synchronous is Horizon's same-frame CPU test; Asynchronous only hides a mesh while its camera and occluder evidence still match.",
+                    &culling_modes,
+                    &gfx.entity_culling,
+                ) {
+                    gfx.entity_culling = value.clone();
+                    changes.push((false, "entityCulling", value));
+                }
+                if let Some(value) = choice_row(
+                    ui,
+                    "Particle culling",
+                    "Hides particles that are out of sight, independent of entity culling.",
+                    &culling_modes,
+                    &gfx.particle_culling,
+                ) {
+                    gfx.particle_culling = value.clone();
+                    changes.push((false, "particleCulling", value));
+                }
+                if let Some(value) = choice_row(
+                    ui,
+                    "GPU culling",
+                    "Auto turns it on only where the CPU limits your frame rate and it makes frames faster.",
+                    &[("off", "Off"), ("on", "On"), ("auto", "Auto")],
+                    &gfx.gpu_culling,
+                ) {
+                    gfx.gpu_culling = value.clone();
+                    changes.push((false, "gpuCulling", value));
+                }
+                if let Some(value) = choice_row(
+                    ui,
+                    "Frame pacing",
+                    "Efficient sleeps until the next frame and spends no CPU spinning. Precise is vanilla's limiter: it sleeps, then spins to the deadline.",
+                    &[("efficient", "Efficient"), ("precise", "Precise")],
+                    &gfx.frame_pacing,
+                ) {
+                    gfx.frame_pacing = value.clone();
+                    changes.push((false, "framePacing", value));
+                }
+            });
+            ui.add_space(12.0);
+
+            glass_card(ui, inner_card(false), |ui| {
+                ui.label(RichText::new("FRAME-RATE SAFETY NET").size(11.0).strong().color(CORAL));
+                ui.add_space(4.0);
+                if setting_row(
+                    ui,
+                    &mut gfx.dynamic_resolution,
+                    "Dynamic resolution",
+                    "Lowers the world's resolution only when frames run long. It trades sharpness for smoothness and does nothing while Resolution Scale is 100%. Not part of either quick setup.",
+                    true,
+                ) {
+                    changes.push((false, "dynamicResolution", gfx.dynamic_resolution.to_string()));
+                }
+                ui.label(RichText::new("Target frame rate").strong().color(TEXT));
+                let response = ui.add(egui::Slider::new(&mut gfx.target_fps, 30..=240).suffix(" fps"));
+                // Write once when the drag ends, not on every frame of it.
+                if response.drag_stopped() || (response.changed() && !response.dragged()) {
+                    changes.push((false, "targetFps", gfx.target_fps.to_string()));
+                }
+            });
+        });
+
+        let saved_any = !changes.is_empty();
+        let mut failed = false;
+        for (in_options, key, value) in changes {
+            if !self.write_gfx(in_options, key, &value) {
+                failed = true;
+                break;
+            }
+        }
+        if failed {
+            // Show what is really on disk after a failed write.
+            self.reload_gfx();
+        } else {
+            self.gfx = Some(gfx);
+            if saved_any {
+                self.status = Some(Status { message: "Graphics settings saved.".into(), error: false });
+            }
+        }
         self.status_line(ui);
     }
 
@@ -1173,6 +1406,26 @@ impl eframe::App for NebulaClient {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         self.poll_game_start(ctx);
         self.sunset.paint(ctx);
+        // Ctrl/Cmd + 1..6 jumps to a page.
+        const PAGE_KEYS: [egui::Key; 6] = [
+            egui::Key::Num1,
+            egui::Key::Num2,
+            egui::Key::Num3,
+            egui::Key::Num4,
+            egui::Key::Num5,
+            egui::Key::Num6,
+        ];
+        let hotkey = ctx.input(|input| {
+            if !input.modifiers.command {
+                return None;
+            }
+            (0..Page::ALL.len())
+                .find(|&n| input.key_pressed(PAGE_KEYS[n]))
+                .map(|n| Page::ALL[n].0)
+        });
+        if let Some(page) = hotkey {
+            self.go_to(page);
+        }
         self.windowbar(ctx);
         self.sidebar(ctx);
 
@@ -1187,6 +1440,7 @@ impl eframe::App for NebulaClient {
                         match self.page {
                             Page::Play => self.play_page(ui, ctx),
                             Page::Performance => self.performance_page(ui),
+                            Page::Graphics => self.graphics_page(ui),
                             Page::Shaders => self.shaders_page(ui, ctx),
                             Page::Diagnostics => self.diagnostics_page(ui),
                             Page::Settings => self.settings_page(ui),
@@ -1615,6 +1869,16 @@ fn draw_nav_icon(painter: &egui::Painter, page: Page, c: egui::Pos2, color: Colo
             painter.line_segment([p(-4.0, 1.0), p(4.0, 1.0)], s);
             painter.line_segment([p(4.0, 1.0), p(-2.5, 9.0)], s);
         }
+        Page::Graphics => {
+            painter.rect_stroke(
+                egui::Rect::from_min_max(p(-9.0, -7.0), p(9.0, 4.0)),
+                2.0,
+                s,
+                egui::StrokeKind::Inside,
+            );
+            painter.line_segment([p(0.0, 4.0), p(0.0, 8.0)], s);
+            painter.line_segment([p(-4.5, 8.0), p(4.5, 8.0)], s);
+        }
         Page::Shaders => {
             painter.circle_stroke(c, 4.0, s);
             for i in 0..8 {
@@ -1729,6 +1993,185 @@ fn launch_progress(ui: &mut egui::Ui, time: f32) {
             lerp_color(VIOLET, CORAL, phase),
         );
     }
+}
+
+// <settings-logic>
+// Reading and writing Horizon's `key:value` settings files. Standard library only.
+
+/// Leaf, transparency and culling settings of one instance.
+/// Values and defaults follow `horizon-client-render` (`graphics.rs`, `options_file.rs`).
+#[derive(Clone, Debug, PartialEq)]
+struct GfxSettings {
+    /// `options.txt` `cutoutLeaves`: see-through gaps in leaves.
+    cutout_leaves: bool,
+    /// `options.txt` `improvedTransparency`.
+    improved_transparency: bool,
+    /// `horizon-graphics.txt` `leafCulling`: off, hidden, solid, solid_aggressive, hollow.
+    leaf_culling: String,
+    /// `entityCulling` and `particleCulling`: off, sync, async.
+    entity_culling: String,
+    particle_culling: String,
+    /// `gpuCulling`: off, on, auto.
+    gpu_culling: String,
+    cave_culling: bool,
+    dynamic_resolution: bool,
+    /// 30..=240.
+    target_fps: u32,
+    /// `framePacing`: efficient or precise.
+    frame_pacing: String,
+}
+
+type GfxChange = (bool, &'static str, String);
+
+impl GfxSettings {
+    fn read(options: &Path, graphics: &Path) -> Self {
+        let options_text = fs::read_to_string(options).unwrap_or_default();
+        let graphics_text = fs::read_to_string(graphics).unwrap_or_default();
+        Self::parse(&options_text, &graphics_text)
+    }
+
+    fn parse(options_text: &str, graphics_text: &str) -> Self {
+        let flag = |text: &str, key: &str, default: bool| match read_setting(text, key).as_deref() {
+            Some("true") => true,
+            Some("false") => false,
+            _ => default,
+        };
+        let word = |key: &str, allowed: &[&str], default: &str| {
+            read_setting(graphics_text, key)
+                .filter(|value| allowed.contains(&value.as_str()))
+                .unwrap_or_else(|| default.to_owned())
+        };
+        Self {
+            cutout_leaves: flag(options_text, "cutoutLeaves", true),
+            improved_transparency: flag(options_text, "improvedTransparency", false),
+            leaf_culling: word(
+                "leafCulling",
+                &["off", "hidden", "solid", "solid_aggressive", "hollow"],
+                "off",
+            ),
+            entity_culling: word("entityCulling", &["off", "sync", "async"], "off"),
+            particle_culling: word("particleCulling", &["off", "sync", "async"], "off"),
+            gpu_culling: word("gpuCulling", &["off", "on", "auto"], "off"),
+            cave_culling: flag(graphics_text, "caveCulling", true),
+            dynamic_resolution: flag(graphics_text, "dynamicResolution", false),
+            target_fps: read_setting(graphics_text, "targetFps")
+                .and_then(|value| value.parse::<u32>().ok())
+                .unwrap_or(60)
+                .clamp(30, 240),
+            frame_pacing: word("framePacing", &["efficient", "precise"], "efficient"),
+        }
+    }
+
+    /// Culling that skips drawing what cannot be seen. Meant to leave the picture unchanged;
+    /// the leaf mode "hidden" keeps a crown looking the same from outside.
+    fn apply_smooth_same_look(&mut self) -> Vec<GfxChange> {
+        self.cave_culling = true;
+        self.entity_culling = "async".into();
+        self.particle_culling = "async".into();
+        self.gpu_culling = "auto".into();
+        self.leaf_culling = "hidden".into();
+        self.frame_pacing = "efficient".into();
+        vec![
+            (false, "caveCulling", "true".into()),
+            (false, "entityCulling", "async".into()),
+            (false, "particleCulling", "async".into()),
+            (false, "gpuCulling", "auto".into()),
+            (false, "leafCulling", "hidden".into()),
+            (false, "framePacing", "efficient".into()),
+        ]
+    }
+
+    /// Back to Horizon's plain defaults for every culling option and dynamic resolution.
+    fn apply_plain_rendering(&mut self) -> Vec<GfxChange> {
+        self.cave_culling = true;
+        self.entity_culling = "off".into();
+        self.particle_culling = "off".into();
+        self.gpu_culling = "off".into();
+        self.leaf_culling = "off".into();
+        self.dynamic_resolution = false;
+        vec![
+            (false, "caveCulling", "true".into()),
+            (false, "entityCulling", "off".into()),
+            (false, "particleCulling", "off".into()),
+            (false, "gpuCulling", "off".into()),
+            (false, "leafCulling", "off".into()),
+            (false, "dynamicResolution", "false".into()),
+        ]
+    }
+}
+
+/// The value of `key:` in a settings file's text, trimmed.
+fn read_setting(text: &str, key: &str) -> Option<String> {
+    let prefix = format!("{key}:");
+    text.lines()
+        .find_map(|line| line.strip_prefix(prefix.as_str()).map(|value| value.trim().to_owned()))
+}
+
+/// Replaces every `key:` line, or appends one; all other lines are kept as they are.
+fn set_setting_text(text: &str, key: &str, value: &str) -> String {
+    let prefix = format!("{key}:");
+    let mut lines: Vec<String> = text.lines().map(str::to_owned).collect();
+    let mut replaced = false;
+    for line in &mut lines {
+        if line.starts_with(prefix.as_str()) {
+            *line = format!("{key}:{value}");
+            replaced = true;
+        }
+    }
+    if !replaced {
+        lines.push(format!("{key}:{value}"));
+    }
+    let mut out = lines.join("\n");
+    out.push('\n');
+    out
+}
+
+/// Writes one setting to an existing settings file through a temporary file and a rename.
+fn write_setting(path: &Path, key: &str, value: &str) -> Result<(), String> {
+    let text = fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
+    let out = set_setting_text(&text, key, value);
+    let temporary = path.with_extension("txt.tmp");
+    fs::write(&temporary, out).map_err(|error| error.to_string())?;
+    fs::rename(&temporary, path).map_err(|error| error.to_string())
+}
+// </settings-logic>
+
+/// A row of mutually exclusive choices under a title and description.
+/// Returns the newly picked value, if any.
+fn choice_row(
+    ui: &mut egui::Ui,
+    title: &str,
+    description: &str,
+    options: &[(&str, &str)],
+    current: &str,
+) -> Option<String> {
+    let mut picked = None;
+    ui.label(RichText::new(title).strong().color(TEXT));
+    ui.label(RichText::new(description).small().color(MUTED));
+    ui.add_space(2.0);
+    ui.horizontal(|ui| {
+        for (value, label) in options {
+            let selected = current == *value;
+            if ui
+                .selectable_label(selected, RichText::new(*label).size(13.5).color(TEXT))
+                .clicked()
+                && !selected
+            {
+                picked = Some((*value).to_owned());
+            }
+        }
+    });
+    ui.separator();
+    picked
+}
+
+fn accent_button(ui: &mut egui::Ui, text: &str) -> egui::Response {
+    ui.add(
+        Button::new(RichText::new(text).size(14.0).color(TEXT))
+            .fill(Color32::from_rgba_unmultiplied(137, 91, 231, 100))
+            .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(214, 190, 255, 120)))
+            .min_size(Vec2::new(170.0, 38.0)),
+    )
 }
 
 fn discover_versions() -> Vec<HorizonVersion> {
@@ -2424,5 +2867,97 @@ mod tests {
         assert_eq!(native.title, "Soft Light");
 
         fs::remove_dir_all(&dir).ok();
+    }
+}
+
+#[cfg(test)]
+mod gfx_tests {
+    use super::*;
+
+    #[test]
+    fn missing_keys_use_horizon_defaults() {
+        let g = GfxSettings::parse("", "");
+        assert!(g.cutout_leaves && g.cave_culling);
+        assert!(!g.improved_transparency && !g.dynamic_resolution);
+        assert_eq!(g.leaf_culling, "off");
+        assert_eq!(g.entity_culling, "off");
+        assert_eq!(g.gpu_culling, "off");
+        assert_eq!(g.target_fps, 60);
+        assert_eq!(g.frame_pacing, "efficient");
+    }
+
+    #[test]
+    fn reads_values_and_rejects_unknown_ones() {
+        let g = GfxSettings::parse(
+            "cutoutLeaves:false\nimprovedTransparency:true\n",
+            "leafCulling:hollow\nentityCulling:async\nparticleCulling:banana\ngpuCulling:auto\ncaveCulling:false\ndynamicResolution:true\ntargetFps:999\nframePacing:precise\n",
+        );
+        assert!(!g.cutout_leaves && g.improved_transparency && !g.cave_culling && g.dynamic_resolution);
+        assert_eq!(g.leaf_culling, "hollow");
+        assert_eq!(g.entity_culling, "async");
+        assert_eq!(g.particle_culling, "off", "unknown value falls back to the default");
+        assert_eq!(g.gpu_culling, "auto");
+        assert_eq!(g.target_fps, 240, "clamped like Horizon");
+        assert_eq!(g.frame_pacing, "precise");
+    }
+
+    #[test]
+    fn key_match_is_exact_not_a_prefix() {
+        let text = "fxaa:true\ntaa:false\n";
+        assert_eq!(read_setting(text, "taa").as_deref(), Some("false"));
+        assert_eq!(read_setting(text, "xaa"), None);
+        let out = set_setting_text(text, "taa", "true");
+        assert_eq!(out, "fxaa:true\ntaa:true\n");
+    }
+
+    #[test]
+    fn set_keeps_every_other_line_and_appends_when_missing() {
+        let text = "preset:performance\nlodDistance:128\nleafCulling:off\nresolutionScale:80\n";
+        let out = set_setting_text(text, "leafCulling", "hidden");
+        assert_eq!(out, "preset:performance\nlodDistance:128\nleafCulling:hidden\nresolutionScale:80\n");
+        let out = set_setting_text(text, "caveCulling", "true");
+        assert!(out.ends_with("resolutionScale:80\ncaveCulling:true\n"));
+        assert_eq!(out.lines().count(), 5);
+    }
+
+    #[test]
+    fn write_setting_round_trips_on_disk_and_errors_when_missing() {
+        let dir = std::env::temp_dir().join(format!("nebula-gfx-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let graphics = dir.join("horizon-graphics.txt");
+        let options = dir.join("options.txt");
+        fs::write(&graphics, "preset:performance\nleafCulling:off\npickedShaderPack:a.zip\n").unwrap();
+        fs::write(&options, "fov:70\ncutoutLeaves:true\nmaxFps:120\n").unwrap();
+
+        write_setting(&options, "cutoutLeaves", "false").unwrap();
+        write_setting(&graphics, "leafCulling", "hidden").unwrap();
+        write_setting(&graphics, "preset", "custom").unwrap();
+        let g = GfxSettings::read(&options, &graphics);
+        assert!(!g.cutout_leaves);
+        assert_eq!(g.leaf_culling, "hidden");
+        let kept = fs::read_to_string(&graphics).unwrap();
+        assert!(kept.contains("pickedShaderPack:a.zip") && kept.contains("preset:custom"));
+        assert!(fs::read_to_string(&options).unwrap().contains("fov:70\n"));
+        assert!(!dir.join("options.txt.tmp").exists(), "temp file renamed away");
+
+        let missing = dir.join("nope.txt");
+        assert!(write_setting(&missing, "a", "b").is_err());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn presets_change_only_their_own_keys() {
+        let mut g = GfxSettings::parse("cutoutLeaves:true\n", "dynamicResolution:true\ntargetFps:90\n");
+        let changes = g.apply_smooth_same_look();
+        assert_eq!(changes.len(), 6);
+        assert!(changes.iter().all(|(in_options, _, _)| !in_options));
+        assert!(g.dynamic_resolution && g.target_fps == 90 && g.cutout_leaves, "untouched");
+        let keys: Vec<_> = changes.iter().map(|c| c.1).collect();
+        assert!(!keys.contains(&"cutoutLeaves") && !keys.contains(&"dynamicResolution"));
+
+        let changes = g.apply_plain_rendering();
+        assert!(!g.dynamic_resolution && g.leaf_culling == "off" && g.gpu_culling == "off");
+        assert!(changes.iter().any(|c| c.1 == "dynamicResolution" && c.2 == "false"));
+        assert!(g.cutout_leaves, "plain rendering never touches leaf transparency");
     }
 }
