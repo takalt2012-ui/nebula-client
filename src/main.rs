@@ -18,13 +18,17 @@ use std::time::{Instant, SystemTime};
 
 const SIDEBAR: Color32 = Color32::from_rgb(17, 15, 34);
 const BACKGROUND: Color32 = Color32::from_rgb(9, 7, 25);
-const HAIRLINE: Color32 = Color32::from_rgb(69, 58, 101);
 const TEXT: Color32 = Color32::from_rgb(246, 242, 255);
 const MUTED: Color32 = Color32::from_rgb(173, 166, 194);
 const PURPLE: Color32 = Color32::from_rgb(123, 78, 245);
 const PURPLE_BRIGHT: Color32 = Color32::from_rgb(187, 147, 255);
 const SUCCESS: Color32 = Color32::from_rgb(146, 226, 160);
 const DANGER: Color32 = Color32::from_rgb(255, 156, 171);
+// Sunset-derived accents shared by the launcher chrome (the backdrop itself lives in scene.rs).
+const VIOLET: Color32 = Color32::from_rgb(143, 92, 255);
+const CORAL: Color32 = Color32::from_rgb(239, 124, 99);
+/// Opacity of the main glass panel. Lower shows more sunset, higher improves text contrast.
+const GLASS_ALPHA: u8 = 118;
 const HUD_WIDGETS: [&str; 14] = ["effects", "items", "durability", "totems", "health", "cooldowns", "coordinates", "fps", "ping", "speed", "cps", "clock", "armor_mini", "pickups"];
 const HUD_FEATURE_LABELS: [(&str, &str); 14] = [
     ("Effects", "Potion and status effects"), ("Items", "Consumable timers"),
@@ -48,9 +52,9 @@ enum Page {
 impl Page {
     const ALL: [(Self, &'static str); 5] = [
         (Self::Play, "Home"),
-        (Self::Performance, "Mods"),
+        (Self::Performance, "Performance"),
         (Self::Shaders, "Shaders"),
-        (Self::Diagnostics, "Builds"),
+        (Self::Diagnostics, "Diagnostics"),
         (Self::Settings, "Settings"),
     ];
 }
@@ -519,174 +523,138 @@ impl NebulaClient {
         }
     }
 
-    fn topbar(&mut self, ctx: &Context) {
-        egui::TopBottomPanel::top("topbar")
-            .exact_height(60.0)
+    fn windowbar(&mut self, ctx: &Context) {
+        let account = self.selected_account().map(|account| account.name.clone());
+        egui::TopBottomPanel::top("windowbar")
+            .exact_height(48.0)
             .frame(
                 Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(27, 18, 52, 238))
-                    .inner_margin(Margin::symmetric(22, 8))
-                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(172, 133, 255, 45))),
+                    .fill(Color32::from_rgba_unmultiplied(10, 7, 24, 112))
+                    .inner_margin(Margin::symmetric(16, 7))
+                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 22))),
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    horizon_logo(ui, &self.logo, 36.0);
-                    ui.add_space(12.0);
-                    ui.horizontal(|ui| {
-                        for (page, label) in Page::ALL {
-                            let selected = self.page == page;
-                            let button = Button::new(RichText::new(label).size(14.0).strong().color(if selected { TEXT } else { MUTED }))
-                                .fill(if selected { Color32::from_rgba_unmultiplied(139, 91, 249, 185) } else { Color32::TRANSPARENT })
-                                .stroke(Stroke::new(1.0_f32, if selected { Color32::from_rgba_unmultiplied(203, 174, 255, 125) } else { Color32::TRANSPARENT }))
-                                .min_size(Vec2::new(77.0, 39.0));
-                            if ui.add(button).clicked() { self.page = page; }
-                        }
-                    });
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let account = self
-                            .selected_account()
-                            .map(|account| account.name.as_str())
-                            .unwrap_or("Account not loaded");
-                        Frame::NONE
-                            .fill(Color32::from_rgba_unmultiplied(104, 70, 177, 90))
-                            .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(193, 158, 255, 100)))
-                            .inner_margin(Margin::symmetric(14, 7))
-                            .show(ui, |ui| {
-                                ui.vertical(|ui| {
-                                    ui.label(RichText::new(account).strong().color(TEXT));
-                                    ui.label(RichText::new("Horizon account").small().color(MUTED));
-                                });
-                            });
-                    });
-                });
-            });
-    }
-
-    fn windowbar(&mut self, ctx: &Context) {
-        egui::TopBottomPanel::top("windowbar")
-            .exact_height(42.0)
-            .frame(Frame::NONE.fill(Color32::from_rgb(87, 48, 154)).inner_margin(Margin::symmetric(14, 4)))
-            .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    horizon_logo(ui, &self.logo, 27.0);
-                    ui.add_space(8.0);
-                    ui.label(RichText::new("NEBULA").size(13.0).strong().color(Color32::WHITE));
-                    ui.label(RichText::new("CLIENT").size(10.0).strong().color(Color32::from_rgb(222, 204, 255)));
-                    let drag_width = (ui.available_width() - 150.0).max(24.0);
+                    horizon_logo(ui, &self.logo, 28.0);
+                    ui.add_space(6.0);
+                    ui.label(RichText::new("NEBULA").size(14.0).strong().color(TEXT));
+                    ui.label(RichText::new("CLIENT").size(10.5).strong().color(CORAL));
+                    let drag_width = (ui.available_width() - 330.0).max(24.0);
                     let (drag_rect, drag) = ui.allocate_exact_size(Vec2::new(drag_width, 34.0), egui::Sense::click_and_drag());
                     if drag.drag_started() { ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag); }
-                    ui.painter().text(drag_rect.center(), egui::Align2::CENTER_CENTER, "Horizon  ·  Rust Edition", FontId::new(12.0, FontFamily::Proportional), Color32::from_rgba_unmultiplied(255, 255, 255, 190));
+                    ui.painter().text(drag_rect.center(), egui::Align2::CENTER_CENTER, "Horizon  ·  Rust Edition", FontId::new(12.0, FontFamily::Proportional), Color32::from_rgba_unmultiplied(255, 255, 255, 140));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         window_control(ui, ctx, WindowAction::Close);
                         window_control(ui, ctx, WindowAction::Maximize);
                         window_control(ui, ctx, WindowAction::Minimize);
+                        ui.add_space(8.0);
+                        account_chip(ui, account.as_deref());
                     });
                 });
             });
     }
 
     fn sidebar(&mut self, ctx: &Context) {
+        // Collapse to an icon rail on narrow windows.
+        let compact = ctx.screen_rect().width() < 1060.0;
         egui::SidePanel::left("sidebar")
-            .exact_width(104.0)
+            .exact_width(if compact { 78.0 } else { 196.0 })
             .frame(
                 Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(17, 15, 34, 230))
-                    .inner_margin(Margin::symmetric(11, 14))
-                    .stroke(Stroke::new(1.0_f32, HAIRLINE)),
+                    .fill(Color32::from_rgba_unmultiplied(10, 7, 24, 100))
+                    .inner_margin(Margin::symmetric(12, 18))
+                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 22))),
             )
             .show(ctx, |ui| {
-                ui.add_space(5.0);
-                let add = Button::new(RichText::new("+").size(25.0).color(PURPLE_BRIGHT))
-                    .fill(Color32::from_rgba_unmultiplied(44, 35, 74, 220))
-                    .stroke(Stroke::new(1.0_f32, HAIRLINE));
-                ui.add_sized([60.0, 52.0], add);
-                ui.add_space(13.0);
-                Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(68, 50, 111, 190))
-                    .stroke(Stroke::new(1.0_f32, PURPLE))
-                    .inner_margin(Margin::symmetric(6, 9))
-                    .show(ui, |ui| {
-                        ui.vertical_centered(|ui| {
-                            horizon_logo(ui, &self.logo, 42.0);
-                            ui.add_space(4.0);
-                            ui.label(RichText::new("Nebula").small().strong().color(TEXT));
-                        });
-                    });
+                if !compact {
+                    ui.label(RichText::new("MENU").size(10.5).strong().color(MUTED));
+                }
+                ui.spacing_mut().item_spacing.y = 6.0;
+                for (page, label) in Page::ALL {
+                    if nav_item(ui, page, label, self.page == page, compact).clicked() {
+                        self.page = page;
+                    }
+                }
                 ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
-                    ui.separator();
-                    ui.label(RichText::new("26.3").small().color(MUTED));
-                    ui.label(RichText::new("RUST").small().strong().color(PURPLE_BRIGHT));
+                    ui.label(
+                        RichText::new(if compact { "26.3" } else { "Horizon 26.3  ·  Rust" })
+                            .size(11.0)
+                            .color(MUTED),
+                    );
                 });
             });
     }
 
     fn play_page(&mut self, ui: &mut egui::Ui, ctx: &Context) {
-        Frame::NONE.fill(Color32::from_rgba_unmultiplied(17, 13, 34, 205))
-            .stroke(Stroke::new(1.0_f32, HAIRLINE)).inner_margin(Margin::symmetric(25, 22)).show(ui, |ui| {
-            ui.horizontal(|ui| {
+        let running = game_is_running();
+        let starting = self.pending_game.is_some();
+
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.label(RichText::new("NEBULA  /  HORIZON 26.3").size(11.0).strong().color(CORAL));
+                ui.add_space(3.0);
+                ui.label(
+                    RichText::new("Your world,\nat full speed.")
+                        .font(FontId::new(36.0, FontFamily::Proportional))
+                        .strong()
+                        .color(TEXT),
+                );
+                ui.add_space(6.0);
+                ui.label(RichText::new("Native Minecraft client  ·  Rust edition").color(MUTED));
+            });
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.vertical(|ui| {
-                    ui.label(RichText::new("NEBULA  /  HORIZON 26.3").small().strong().color(PURPLE_BRIGHT));
-                    ui.add_space(3.0);
-                    ui.label(RichText::new("Your world,\nat full speed.").font(FontId::new(34.0, FontFamily::Proportional)).strong().color(TEXT));
-                    ui.add_space(7.0);
-                    ui.label(RichText::new("Native Minecraft client  ·  Rust edition").color(MUTED));
-                });
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new(if game_is_running() { "GAME RUNNING" } else { "READY TO PLAY" }).small().strong().color(if game_is_running() { SUCCESS } else { PURPLE_BRIGHT }));
-                        ui.add_space(4.0);
-                        ui.label(RichText::new(self.selected_version().map(|v| v.label.as_str()).unwrap_or("No build selected")).color(TEXT));
-                    });
+                    let (state, color) = if running {
+                        ("GAME RUNNING", SUCCESS)
+                    } else if starting {
+                        ("STARTING", CORAL)
+                    } else {
+                        ("READY TO PLAY", PURPLE_BRIGHT)
+                    };
+                    ui.label(RichText::new(state).size(11.0).strong().color(color));
+                    ui.add_space(4.0);
+                    ui.label(
+                        RichText::new(
+                            self.selected_version()
+                                .map(|v| v.label.as_str())
+                                .unwrap_or("No build selected"),
+                        )
+                        .color(TEXT),
+                    );
                 });
             });
-            ui.add_space(16.0);
-            ui.separator();
-            ui.add_space(8.0);
-            let performance_changed = Frame::NONE
-            .fill(Color32::from_rgba_unmultiplied(30, 24, 49, 180))
-            .stroke(Stroke::new(1.0_f32, HAIRLINE))
-            .inner_margin(Margin::symmetric(16, 11))
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new("Performance profile").strong().color(TEXT));
-                        ui.label(
-                            RichText::new(
-                                "Dedicated shader cache and optional game-scoped tweaks",
-                            )
+        });
+        ui.add_space(16.0);
+        ui.separator();
+        ui.add_space(8.0);
+
+        let performance_changed = glass_card(ui, inner_card(false), |ui| {
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(RichText::new("Performance profile").strong().color(TEXT));
+                    ui.label(
+                        RichText::new("Dedicated shader cache and optional game-scoped tweaks")
                             .small()
                             .color(MUTED),
-                        );
-                    });
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(
-                            RichText::new(if self.settings.performance_mode {
-                                "ON"
-                            } else {
-                                "OFF"
-                            })
+                    );
+                });
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    ui.label(
+                        RichText::new(if self.settings.performance_mode { "ON" } else { "OFF" })
                             .small()
                             .strong()
-                            .color(
-                                if self.settings.performance_mode {
-                                    PURPLE_BRIGHT
-                                } else {
-                                    MUTED
-                                },
-                            ),
-                        );
-                        toggle_switch(ui, &mut self.settings.performance_mode)
-                    })
-                    .inner
-                    .changed()
+                            .color(if self.settings.performance_mode { PURPLE_BRIGHT } else { MUTED }),
+                    );
+                    toggle_switch(ui, &mut self.settings.performance_mode)
                 })
                 .inner
+                .changed()
             })
-            .inner;
+            .inner
+        });
         if performance_changed {
             self.persist_selection();
         }
-        });
         ui.add_space(16.0);
 
         let previous_version = self.selected_version;
@@ -769,23 +737,31 @@ impl NebulaClient {
         }
 
         ui.add_space(14.0);
-        let ready = self.selected_version().is_some()
-            && self.selected_resource().is_some()
-            && self.selected_account_id().is_some()
-            && self.official_launcher.is_some();
-        let label = "Play";
-        if ui
-            .add_enabled(
-                ready,
-                Button::new(RichText::new(format!("▶   {label}")).strong().size(17.0).color(TEXT))
-                    .fill(PURPLE)
-                    .min_size(Vec2::new(290.0, 58.0)),
-            )
-            .clicked()
-        {
+        // Same four requirements the launch path checks, surfaced before the click.
+        let blocker = if self.official_launcher.is_none() {
+            Some("Horizon's sign-in helper was not found.")
+        } else if self.selected_version().is_none() {
+            Some("Choose a Horizon build above.")
+        } else if self.selected_resource().is_none() {
+            Some("This build has no prepared resource set.")
+        } else if self.selected_account_id().is_none() {
+            Some("Load and choose an account to play.")
+        } else {
+            None
+        };
+        if play_button(ui, blocker.is_none() && !starting, starting) {
             self.launch(ctx);
         }
-        ui.add_space(7.0);
+        if starting {
+            ui.add_space(8.0);
+            launch_progress(ui, ctx.input(|input| input.time) as f32);
+            // Keeps the indeterminate sweep animating while Horizon starts.
+            ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        } else if let Some(reason) = blocker {
+            ui.add_space(6.0);
+            ui.label(RichText::new(reason).small().color(MUTED));
+        }
+        ui.add_space(8.0);
         ui.horizontal(|ui| {
             if quiet_action(ui, "↻", "Refresh builds").clicked() {
                 self.refresh();
@@ -794,7 +770,7 @@ impl NebulaClient {
                     error: false,
                 });
             }
-            if game_is_running() {
+            if running {
                 ui.label(
                     RichText::new("A Horizon client is already running.").color(PURPLE_BRIGHT),
                 );
@@ -804,16 +780,13 @@ impl NebulaClient {
     }
 
     fn performance_page(&mut self, ui: &mut egui::Ui) {
-        ui.label(RichText::new("PERFORMANCE").small().color(PURPLE_BRIGHT));
-        ui.add_space(8.0);
-        ui.label(
-            RichText::new("Performance Mode")
-                .font(FontId::new(42.0, FontFamily::Proportional))
-                .color(TEXT),
+        page_header(
+            ui,
+            "PERFORMANCE",
+            "Performance Mode",
+            "Only supported, game-scoped settings are applied. No system-wide tuning is changed.",
         );
-        ui.label(RichText::new("Only supported, game-scoped settings are applied. No system-wide tuning is changed.").color(MUTED));
-        ui.add_space(12.0);
-        Frame::NONE.fill(Color32::from_rgba_unmultiplied(30, 24, 49, 225)).stroke(Stroke::new(1.0_f32, HAIRLINE)).inner_margin(Margin::symmetric(16, 13)).show(ui, |ui| {
+        glass_card(ui, inner_card(false), |ui| {
             ui.label(RichText::new("IN-GAME HUD  ·  BASIC HUD").small().strong().color(PURPLE_BRIGHT));
             ui.label(RichText::new(if self.hud_config_path.is_some() { "These switches update the installed native mod." } else { "Basic HUD settings are not available for the selected instance." }).small().color(MUTED));
             ui.add_space(8.0);
@@ -921,20 +894,12 @@ impl NebulaClient {
             self.install_shader_pack(&path);
         }
 
-        ui.label(RichText::new("SHADERS").small().color(PURPLE_BRIGHT));
-        ui.add_space(8.0);
-        ui.label(
-            RichText::new("Shader Packs")
-                .font(FontId::new(42.0, FontFamily::Proportional))
-                .color(TEXT),
+        page_header(
+            ui,
+            "SHADERS",
+            "Shader Packs",
+            "Enable or disable a pack for the selected instance. Drop a .zip or .hshader anywhere on this page to install it.",
         );
-        ui.label(
-            RichText::new(
-                "Enable or disable a pack for the selected instance. Drop a .zip or .hshader anywhere on this page to install it.",
-            )
-            .color(MUTED),
-        );
-        ui.add_space(12.0);
 
         if self.shader_dir.is_none() {
             ui.label(
@@ -952,11 +917,7 @@ impl NebulaClient {
         let packs = self.shader_packs.clone();
 
         // Current pick / off state.
-        Frame::NONE
-            .fill(Color32::from_rgba_unmultiplied(30, 24, 49, 225))
-            .stroke(Stroke::new(1.0_f32, HAIRLINE))
-            .inner_margin(Margin::symmetric(16, 13))
-            .show(ui, |ui| {
+        glass_card(ui, inner_card(false), |ui| {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
                         ui.label(RichText::new("ACTIVE").small().strong().color(PURPLE_BRIGHT));
@@ -995,18 +956,7 @@ impl NebulaClient {
 
         ui.add_space(10.0);
         let hovering = ctx.input(|input| !input.raw.hovered_files.is_empty());
-        Frame::NONE
-            .fill(if hovering {
-                Color32::from_rgba_unmultiplied(137, 91, 231, 70)
-            } else {
-                Color32::from_rgba_unmultiplied(30, 24, 49, 180)
-            })
-            .stroke(Stroke::new(
-                1.0_f32,
-                if hovering { PURPLE_BRIGHT } else { HAIRLINE },
-            ))
-            .inner_margin(Margin::symmetric(16, 13))
-            .show(ui, |ui| {
+        glass_card(ui, inner_card(hovering), |ui| {
                 ui.vertical_centered(|ui| {
                     ui.label(
                         RichText::new("Drop a shader pack here to install")
@@ -1035,14 +985,7 @@ impl NebulaClient {
         let mut enable_request: Option<String> = None;
         for pack in &packs {
             let active = !picked.is_empty() && (picked == pack.key || picked == pack.file);
-            Frame::NONE
-                .fill(Color32::from_rgba_unmultiplied(30, 24, 49, 180))
-                .stroke(Stroke::new(
-                    1.0_f32,
-                    if active { PURPLE } else { HAIRLINE },
-                ))
-                .inner_margin(Margin::symmetric(16, 11))
-                .show(ui, |ui| {
+            glass_card(ui, inner_card(active), |ui| {
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
                             ui.label(RichText::new(&pack.title).strong().color(TEXT));
@@ -1104,14 +1047,7 @@ impl NebulaClient {
     }
 
     fn diagnostics_page(&mut self, ui: &mut egui::Ui) {
-        ui.label(RichText::new("DIAGNOSTICS").small().color(PURPLE_BRIGHT));
-        ui.add_space(8.0);
-        ui.label(
-            RichText::new("Local installation")
-                .font(FontId::new(42.0, FontFamily::Proportional))
-                .color(TEXT),
-        );
-        ui.add_space(18.0);
+        page_header(ui, "DIAGNOSTICS", "Local installation", "");
         diagnostic_row(ui, "Horizon data", &horizon_data_root());
         diagnostic_row(ui, "Nebula cache", &cache_dir());
         diagnostic_row(ui, "Nebula settings", &settings_path());
@@ -1145,18 +1081,12 @@ impl NebulaClient {
     }
 
     fn settings_page(&mut self, ui: &mut egui::Ui) {
-        ui.label(RichText::new("SETTINGS").small().color(PURPLE_BRIGHT));
-        ui.add_space(8.0);
-        ui.label(
-            RichText::new("Nebula Client")
-                .font(FontId::new(42.0, FontFamily::Proportional))
-                .color(TEXT),
+        page_header(
+            ui,
+            "SETTINGS",
+            "Nebula Client",
+            "Minimal by design: no account service, updater, or telemetry loop.",
         );
-        ui.label(
-            RichText::new("Minimal by design: no account service, updater, or telemetry loop.")
-                .color(MUTED),
-        );
-        ui.add_space(24.0);
         if setting_row(
             ui,
             &mut self.settings.close_after_launch,
@@ -1171,12 +1101,21 @@ impl NebulaClient {
 
     fn status_line(&self, ui: &mut egui::Ui) {
         if let Some(status) = &self.status {
-            ui.add_space(16.0);
-            ui.label(RichText::new(&status.message).color(if status.error {
-                DANGER
-            } else {
-                SUCCESS
-            }));
+            ui.add_space(14.0);
+            let tint = if status.error { DANGER } else { SUCCESS };
+            Frame::NONE
+                .fill(tint.gamma_multiply(0.13))
+                .stroke(Stroke::new(1.0_f32, tint.gamma_multiply(0.45)))
+                .corner_radius(egui::CornerRadius::same(10))
+                .inner_margin(Margin::symmetric(14, 10))
+                .show(ui, |ui| {
+                    let text = if status.error {
+                        format!("Problem: {}", status.message)
+                    } else {
+                        status.message.clone()
+                    };
+                    ui.label(RichText::new(text).color(TEXT));
+                });
         }
     }
 
@@ -1235,22 +1174,24 @@ impl eframe::App for NebulaClient {
         self.poll_game_start(ctx);
         self.sunset.paint(ctx);
         self.windowbar(ctx);
-        self.topbar(ctx);
         self.sidebar(ctx);
 
+        // No full-screen overlay: the sunset stays visible around a single glass panel.
         egui::CentralPanel::default()
-            .frame(
-                Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(11, 8, 26, 155))
-                    .inner_margin(Margin::symmetric(42, 34)),
-            )
+            .frame(Frame::NONE.inner_margin(Margin::symmetric(32, 24)))
             .show(ctx, |ui| {
-                egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| match self.page {
-                    Page::Play => self.play_page(ui, ctx),
-                    Page::Performance => self.performance_page(ui),
-                    Page::Shaders => self.shaders_page(ui, ctx),
-                    Page::Diagnostics => self.diagnostics_page(ui),
-                    Page::Settings => self.settings_page(ui),
+                egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                    let width = (ui.available_width() - 56.0).clamp(320.0, 900.0);
+                    glass_card(ui, glass_frame(GLASS_ALPHA), |ui| {
+                        ui.set_width(width);
+                        match self.page {
+                            Page::Play => self.play_page(ui, ctx),
+                            Page::Performance => self.performance_page(ui),
+                            Page::Shaders => self.shaders_page(ui, ctx),
+                            Page::Diagnostics => self.diagnostics_page(ui),
+                            Page::Settings => self.settings_page(ui),
+                        }
+                    });
                 });
             });
     }
@@ -1297,7 +1238,10 @@ fn configure_egui(ctx: &Context) {
     let mut style = (*ctx.style()).clone();
     style.visuals = egui::Visuals::dark();
     style.visuals.panel_fill = BACKGROUND;
-    style.visuals.window_fill = Color32::from_rgb(31, 20, 49);
+    style.visuals.window_fill = Color32::from_rgb(26, 18, 48);
+    style.visuals.window_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 40));
+    // Separators and hairlines use a faint white so they read as glass edges.
+    style.visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 26));
     style.visuals.extreme_bg_color = SIDEBAR;
     style.visuals.widgets.noninteractive.fg_stroke.color = TEXT;
     style.visuals.widgets.inactive.fg_stroke.color = TEXT;
@@ -1394,30 +1338,21 @@ fn window_control(ui: &mut egui::Ui, ctx: &Context, action: WindowAction) {
 }
 
 fn toggle_switch(ui: &mut egui::Ui, value: &mut bool) -> egui::Response {
-    let desired = Vec2::new(46.0, 26.0);
-    let (rect, response) = ui.allocate_exact_size(desired, egui::Sense::click());
+    let (rect, mut response) = ui.allocate_exact_size(Vec2::new(46.0, 26.0), egui::Sense::click());
     if response.clicked() {
         *value = !*value;
+        // Callers rely on `.changed()` to decide when to persist settings.
+        response.mark_changed();
     }
-    let color = if *value {
-        PURPLE
-    } else {
-        Color32::from_rgb(54, 49, 68)
-    };
-    ui.painter().rect_filled(rect, 13.0, color);
-    ui.painter().circle_filled(
-        egui::pos2(
-            if *value {
-                rect.right() - 13.0
-            } else {
-                rect.left() + 13.0
-            },
-            rect.center().y,
-        ),
-        9.0,
-        Color32::WHITE,
-    );
-    response
+    let t = ui.ctx().animate_bool_with_time(response.id, *value, 0.14);
+    let dim = if ui.is_enabled() { 1.0 } else { 0.4 };
+    let track = lerp_color(Color32::from_rgb(54, 49, 68), VIOLET, t).gamma_multiply(dim);
+    ui.painter().rect_filled(rect, 13.0, track);
+    ui.painter().rect_stroke(rect, 13.0, Stroke::new(1.0_f32, Color32::from_white_alpha(40)), egui::StrokeKind::Inside);
+    let x = rect.left() + 13.0 + (rect.width() - 26.0) * t;
+    ui.painter().circle_filled(egui::pos2(x, rect.center().y + 1.5), 10.0, Color32::from_black_alpha(45));
+    ui.painter().circle_filled(egui::pos2(x, rect.center().y), 9.5, Color32::WHITE.gamma_multiply(dim));
+    response.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
 fn labeled_combo<'a>(
@@ -1483,7 +1418,7 @@ fn setting_row(
     description: &str,
     enabled: bool,
 ) -> bool {
-    let response = ui
+    let changed = ui
         .horizontal(|ui| {
             ui.vertical(|ui| {
                 ui.label(
@@ -1494,13 +1429,14 @@ fn setting_row(
                 ui.label(RichText::new(description).small().color(MUTED));
             });
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.add_enabled(enabled, egui::Checkbox::without_text(value))
+                ui.add_enabled_ui(enabled, |ui| toggle_switch(ui, value)).inner
             })
             .inner
+            .changed()
         })
         .inner;
     ui.separator();
-    response.changed()
+    changed
 }
 
 fn diagnostic_row(ui: &mut egui::Ui, label: &str, value: &Path) {
@@ -1512,6 +1448,287 @@ fn diagnostic_row(ui: &mut egui::Ui, label: &str, value: &Path) {
             .color(MUTED),
     );
     ui.add_space(8.0);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Visual components. Everything below is presentation only; launch logic lives elsewhere.
+// ---------------------------------------------------------------------------------------------
+
+/// Linear blend between two opaque colours.
+fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
+    let t = t.clamp(0.0, 1.0);
+    let mix = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round() as u8;
+    Color32::from_rgb(mix(a.r(), b.r()), mix(a.g(), b.g()), mix(a.b(), b.b()))
+}
+
+/// The main translucent panel that holds a page. The sunset remains visible through it.
+fn glass_frame(alpha: u8) -> Frame {
+    Frame::NONE
+        .fill(Color32::from_rgba_unmultiplied(16, 11, 36, alpha))
+        .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(34)))
+        .corner_radius(egui::CornerRadius::same(18))
+        .inner_margin(Margin::symmetric(28, 24))
+        .shadow(egui::epaint::Shadow {
+            offset: [0, 10],
+            blur: 30,
+            spread: 0,
+            color: Color32::from_black_alpha(70),
+        })
+}
+
+/// A lighter card nested inside the main panel. `highlight` marks hover or active state.
+fn inner_card(highlight: bool) -> Frame {
+    Frame::NONE
+        .fill(if highlight {
+            Color32::from_rgba_unmultiplied(139, 91, 249, 52)
+        } else {
+            Color32::from_white_alpha(12)
+        })
+        .stroke(Stroke::new(
+            1.0_f32,
+            if highlight {
+                Color32::from_rgba_unmultiplied(214, 190, 255, 140)
+            } else {
+                Color32::from_white_alpha(28)
+            },
+        ))
+        .corner_radius(egui::CornerRadius::same(12))
+        .inner_margin(Margin::symmetric(16, 13))
+}
+
+/// Shows `frame` around the contents and adds a faint top-edge highlight so it reads as glass.
+fn glass_card<R>(ui: &mut egui::Ui, frame: Frame, add_contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let output = frame.show(ui, add_contents);
+    let rect = output.response.rect;
+    ui.painter().line_segment(
+        [rect.left_top() + Vec2::new(20.0, 0.5), rect.right_top() + Vec2::new(-20.0, 0.5)],
+        Stroke::new(1.0_f32, Color32::from_white_alpha(52)),
+    );
+    output.inner
+}
+
+fn page_header(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
+    ui.label(RichText::new(eyebrow).size(11.0).strong().color(CORAL));
+    ui.add_space(4.0);
+    ui.label(
+        RichText::new(title)
+            .font(FontId::new(32.0, FontFamily::Proportional))
+            .strong()
+            .color(TEXT),
+    );
+    if !subtitle.is_empty() {
+        ui.label(RichText::new(subtitle).color(MUTED));
+    }
+    ui.add_space(10.0);
+    ui.separator();
+    ui.add_space(8.0);
+}
+
+fn account_chip(ui: &mut egui::Ui, account: Option<&str>) {
+    Frame::NONE
+        .fill(Color32::from_white_alpha(16))
+        .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(34)))
+        .corner_radius(egui::CornerRadius::same(16))
+        .inner_margin(Margin::symmetric(10, 4))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                let (avatar, _) = ui.allocate_exact_size(Vec2::splat(22.0), egui::Sense::hover());
+                let initial = account
+                    .and_then(|name| name.chars().next())
+                    .map(|c| c.to_uppercase().to_string())
+                    .unwrap_or_else(|| "?".to_string());
+                ui.painter().circle_filled(
+                    avatar.center(),
+                    11.0,
+                    if account.is_some() { VIOLET } else { Color32::from_rgb(70, 62, 96) },
+                );
+                ui.painter().text(
+                    avatar.center(),
+                    egui::Align2::CENTER_CENTER,
+                    initial,
+                    FontId::new(12.0, FontFamily::Proportional),
+                    Color32::WHITE,
+                );
+                ui.label(RichText::new(account.unwrap_or("Account not loaded")).size(13.0).color(TEXT));
+            });
+        });
+}
+
+/// One sidebar destination: painted icon, label, animated hover and selection states.
+fn nav_item(ui: &mut egui::Ui, page: Page, label: &str, selected: bool, compact: bool) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 44.0), egui::Sense::click());
+    let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered(), 0.12);
+    let active = ui.ctx().animate_bool_with_time(response.id.with("active"), selected, 0.18);
+    let painter = ui.painter();
+    painter.rect_filled(rect, 12.0, Color32::from_white_alpha((hover * 16.0) as u8));
+    if active > 0.0 {
+        painter.rect_filled(rect, 12.0, Color32::from_rgba_unmultiplied(139, 91, 249, (active * 110.0) as u8));
+        painter.rect_stroke(
+            rect,
+            12.0,
+            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(214, 190, 255, (active * 100.0) as u8)),
+            egui::StrokeKind::Inside,
+        );
+        painter.rect_filled(
+            egui::Rect::from_min_size(rect.left_top() + Vec2::new(0.0, 12.0), Vec2::new(3.0, 20.0)),
+            2.0,
+            CORAL.gamma_multiply(active),
+        );
+    }
+    let color = lerp_color(MUTED, TEXT, active.max(hover * 0.7));
+    let icon_x = if compact { rect.center().x } else { rect.left() + 26.0 };
+    draw_nav_icon(painter, page, egui::pos2(icon_x, rect.center().y), color);
+    if !compact {
+        painter.text(
+            egui::pos2(rect.left() + 50.0, rect.center().y),
+            egui::Align2::LEFT_CENTER,
+            label,
+            FontId::new(14.5, FontFamily::Proportional),
+            color,
+        );
+    }
+    let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
+    if compact {
+        response.on_hover_text(label)
+    } else {
+        response
+    }
+}
+
+/// Small line icons drawn with the painter so they stay crisp and need no icon font.
+fn draw_nav_icon(painter: &egui::Painter, page: Page, c: egui::Pos2, color: Color32) {
+    let s = Stroke::new(1.6_f32, color);
+    let p = |x: f32, y: f32| c + Vec2::new(x, y);
+    match page {
+        Page::Play => {
+            painter.line_segment([p(-8.0, 0.0), p(0.0, -8.0)], s);
+            painter.line_segment([p(0.0, -8.0), p(8.0, 0.0)], s);
+            painter.rect_stroke(
+                egui::Rect::from_min_max(p(-5.5, 0.0), p(5.5, 8.0)),
+                1.5,
+                s,
+                egui::StrokeKind::Inside,
+            );
+        }
+        Page::Performance => {
+            painter.line_segment([p(2.5, -9.0), p(-4.0, 1.0)], s);
+            painter.line_segment([p(-4.0, 1.0), p(4.0, 1.0)], s);
+            painter.line_segment([p(4.0, 1.0), p(-2.5, 9.0)], s);
+        }
+        Page::Shaders => {
+            painter.circle_stroke(c, 4.0, s);
+            for i in 0..8 {
+                let (sin, cos) = (i as f32 * std::f32::consts::FRAC_PI_4).sin_cos();
+                painter.line_segment([p(cos * 6.5, sin * 6.5), p(cos * 9.0, sin * 9.0)], s);
+            }
+        }
+        Page::Diagnostics => {
+            for (y, len) in [(-6.0_f32, 18.0_f32), (0.0, 12.0), (6.0, 15.0)] {
+                painter.line_segment([p(-9.0, y), p(-9.0 + len, y)], s);
+            }
+        }
+        Page::Settings => {
+            for (y, knob) in [(-6.0_f32, -3.0_f32), (0.0, 4.0), (6.0, -1.0)] {
+                painter.line_segment([p(-9.0, y), p(9.0, y)], s);
+                painter.circle_filled(p(knob, y), 2.6, color);
+            }
+        }
+    }
+}
+
+/// The primary call to action: a violet-to-coral sunset gradient with a soft glow.
+/// Returns true when it was clicked while enabled.
+fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
+    let size = Vec2::new(ui.available_width().min(360.0), 62.0);
+    let (full, response) = ui.allocate_exact_size(size, egui::Sense::click());
+    let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered() && enabled, 0.15);
+    let pressed = enabled && response.is_pointer_button_down_on();
+    let rect = if pressed { full.shrink(1.5) } else { full };
+    let r: u8 = 16;
+    let (c1, c2) = if enabled {
+        (
+            lerp_color(VIOLET, Color32::from_rgb(172, 128, 255), hover),
+            lerp_color(CORAL, Color32::from_rgb(255, 160, 118), hover),
+        )
+    } else {
+        (Color32::from_rgb(58, 50, 84), Color32::from_rgb(78, 62, 90))
+    };
+    let painter = ui.painter();
+    if enabled {
+        painter.rect_filled(
+            full.expand(2.0 + 4.0 * hover),
+            egui::CornerRadius::same(r + 4),
+            CORAL.gamma_multiply(0.10 + 0.14 * hover),
+        );
+    }
+    // Flat end caps keep the rounded corners; the gradient mesh fills the span between them.
+    let mid = rect.center().x;
+    painter.rect_filled(
+        egui::Rect::from_min_max(rect.left_top(), egui::pos2(mid, rect.bottom())),
+        egui::CornerRadius { nw: r, ne: 0, sw: r, se: 0 },
+        c1,
+    );
+    painter.rect_filled(
+        egui::Rect::from_min_max(egui::pos2(mid, rect.top()), rect.right_bottom()),
+        egui::CornerRadius { nw: 0, ne: r, sw: 0, se: r },
+        c2,
+    );
+    let g = egui::Rect::from_min_max(
+        egui::pos2(rect.left() + r as f32, rect.top()),
+        egui::pos2(rect.right() - r as f32, rect.bottom()),
+    );
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(g.left_top(), c1);
+    mesh.colored_vertex(g.right_top(), c2);
+    mesh.colored_vertex(g.right_bottom(), c2);
+    mesh.colored_vertex(g.left_bottom(), c1);
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    painter.add(egui::Shape::mesh(mesh));
+    painter.rect_filled(
+        egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.right(), rect.center().y)),
+        egui::CornerRadius { nw: r, ne: r, sw: 0, se: 0 },
+        Color32::from_white_alpha(if enabled { 28 } else { 10 }),
+    );
+    painter.rect_stroke(
+        rect,
+        egui::CornerRadius::same(r),
+        Stroke::new(1.0_f32, Color32::from_white_alpha(if enabled { 80 } else { 24 })),
+        egui::StrokeKind::Inside,
+    );
+    painter.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        if starting { "Starting Horizon…" } else { "▶   Play" },
+        FontId::new(19.0, FontFamily::Proportional),
+        if enabled { Color32::WHITE } else { MUTED },
+    );
+    let clicked = enabled && response.clicked();
+    if enabled {
+        let _ = response.on_hover_cursor(egui::CursorIcon::PointingHand);
+    }
+    clicked
+}
+
+/// Indeterminate indicator shown while Horizon prepares the game. Horizon reports no real
+/// percentage, so this sweeps instead of pretending to measure progress.
+fn launch_progress(ui: &mut egui::Ui, time: f32) {
+    let width = ui.available_width().min(360.0);
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(width, 6.0), egui::Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, 3.0, Color32::from_white_alpha(28));
+    let segment = rect.width() * 0.32;
+    let phase = (time * 0.7).fract();
+    let start = rect.left() - segment + (rect.width() + segment) * phase;
+    let left = start.max(rect.left());
+    let right = (start + segment).min(rect.right());
+    if right > left {
+        painter.rect_filled(
+            egui::Rect::from_min_max(egui::pos2(left, rect.top()), egui::pos2(right, rect.bottom())),
+            3.0,
+            lerp_color(VIOLET, CORAL, phase),
+        );
+    }
 }
 
 fn discover_versions() -> Vec<HorizonVersion> {
