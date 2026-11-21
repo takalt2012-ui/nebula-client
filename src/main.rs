@@ -575,7 +575,7 @@ impl NebulaClient {
 
     fn windowbar(&mut self, ctx: &Context) {
         let account = self.selected_account().map(|account| account.name.clone());
-        egui::TopBottomPanel::top("windowbar")
+        let bar = egui::TopBottomPanel::top("windowbar")
             .exact_height(48.0)
             .frame(
                 Frame::NONE
@@ -602,6 +602,17 @@ impl NebulaClient {
                     });
                 });
             });
+        // Sunset-coloured line along the bottom of the bar, drawn above the panels.
+        let rect = bar.response.rect;
+        let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("bar_accent")));
+        paint_gradient(
+            &painter,
+            egui::Rect::from_min_max(egui::pos2(rect.left(), rect.bottom() - 2.0), rect.right_bottom()),
+            VIOLET.gamma_multiply(0.85),
+            CORAL.gamma_multiply(0.85),
+            CORAL.gamma_multiply(0.85),
+            VIOLET.gamma_multiply(0.85),
+        );
     }
 
     fn sidebar(&mut self, ctx: &Context) {
@@ -631,6 +642,9 @@ impl NebulaClient {
                             .size(11.0)
                             .color(MUTED),
                     );
+                    if !compact {
+                        ui.label(RichText::new("Ctrl + 1-6 switches pages").size(10.5).color(MUTED));
+                    }
                 });
             });
     }
@@ -641,6 +655,7 @@ impl NebulaClient {
 
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
+                accent_pill(ui);
                 ui.label(RichText::new("NEBULA  /  HORIZON 26.3").size(11.0).strong().color(CORAL));
                 ui.add_space(3.0);
                 ui.label(
@@ -1426,6 +1441,14 @@ impl eframe::App for NebulaClient {
         if let Some(page) = hotkey {
             self.go_to(page);
         }
+        // Each page eases in (fade and a short rise) when it becomes the current one.
+        let mut fade = 1.0_f32;
+        for (page, _) in Page::ALL {
+            let t = ctx.animate_bool_with_time(egui::Id::new(("page_fade", page as u8)), self.page == page, 0.25);
+            if self.page == page {
+                fade = 1.0 - (1.0 - t).powi(3);
+            }
+        }
         self.windowbar(ctx);
         self.sidebar(ctx);
 
@@ -1435,7 +1458,9 @@ impl eframe::App for NebulaClient {
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                     let width = (ui.available_width() - 56.0).clamp(320.0, 900.0);
-                    glass_card(ui, glass_frame(GLASS_ALPHA), |ui| {
+                    ui.add_space((1.0 - fade) * 16.0);
+                    let alpha = (GLASS_ALPHA as f32 * (0.55 + 0.45 * fade)) as u8;
+                    glass_card(ui, glass_frame(alpha), |ui| {
                         ui.set_width(width);
                         match self.page {
                             Page::Play => self.play_page(ui, ctx),
@@ -1601,6 +1626,9 @@ fn toggle_switch(ui: &mut egui::Ui, value: &mut bool) -> egui::Response {
     let t = ui.ctx().animate_bool_with_time(response.id, *value, 0.14);
     let dim = if ui.is_enabled() { 1.0 } else { 0.4 };
     let track = lerp_color(Color32::from_rgb(54, 49, 68), VIOLET, t).gamma_multiply(dim);
+    if t > 0.0 {
+        ui.painter().rect_filled(rect.expand(2.5), 15.5, VIOLET.gamma_multiply(0.28 * t * dim));
+    }
     ui.painter().rect_filled(rect, 13.0, track);
     ui.painter().rect_stroke(rect, 13.0, Stroke::new(1.0_f32, Color32::from_white_alpha(40)), egui::StrokeKind::Inside);
     let x = rect.left() + 13.0 + (rect.width() - 26.0) * t;
@@ -1750,18 +1778,52 @@ fn inner_card(highlight: bool) -> Frame {
         .inner_margin(Margin::symmetric(16, 13))
 }
 
-/// Shows `frame` around the contents and adds a faint top-edge highlight so it reads as glass.
+/// A four-corner gradient quad (top-left, top-right, bottom-right, bottom-left).
+fn paint_gradient(painter: &egui::Painter, rect: egui::Rect, tl: Color32, tr: Color32, br: Color32, bl: Color32) {
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(rect.left_top(), tl);
+    mesh.colored_vertex(rect.right_top(), tr);
+    mesh.colored_vertex(rect.right_bottom(), br);
+    mesh.colored_vertex(rect.left_bottom(), bl);
+    mesh.add_triangle(0, 1, 2);
+    mesh.add_triangle(0, 2, 3);
+    painter.add(egui::Shape::mesh(mesh));
+}
+
+/// Shows `frame` around the contents, then adds a soft sheen and a lit top edge so it reads as glass.
 fn glass_card<R>(ui: &mut egui::Ui, frame: Frame, add_contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let output = frame.show(ui, add_contents);
     let rect = output.response.rect;
-    ui.painter().line_segment(
-        [rect.left_top() + Vec2::new(20.0, 0.5), rect.right_top() + Vec2::new(-20.0, 0.5)],
-        Stroke::new(1.0_f32, Color32::from_white_alpha(52)),
-    );
+    let painter = ui.painter();
+    // Sheen fading down from the top edge, inset so it never pokes past the rounded corners.
+    if rect.width() > 60.0 && rect.height() > 40.0 {
+        let sheen = egui::Rect::from_min_max(
+            rect.left_top() + Vec2::new(18.0, 1.0),
+            egui::pos2(rect.right() - 18.0, rect.top() + (rect.height() * 0.4).min(64.0)),
+        );
+        let top = Color32::from_white_alpha(16);
+        paint_gradient(painter, sheen, top, top, Color32::TRANSPARENT, Color32::TRANSPARENT);
+        // Top edge light, brightest in the middle.
+        let y = rect.top() + 0.5;
+        let mid = rect.center().x;
+        let edge = Color32::from_white_alpha(70);
+        let left = egui::Rect::from_min_max(egui::pos2(rect.left() + 18.0, y), egui::pos2(mid, y + 1.0));
+        let right = egui::Rect::from_min_max(egui::pos2(mid, y), egui::pos2(rect.right() - 18.0, y + 1.0));
+        paint_gradient(painter, left, Color32::TRANSPARENT, edge, edge, Color32::TRANSPARENT);
+        paint_gradient(painter, right, edge, Color32::TRANSPARENT, Color32::TRANSPARENT, edge);
+    }
     output.inner
 }
 
+/// A short violet-to-coral bar used as a section mark.
+fn accent_pill(ui: &mut egui::Ui) {
+    let (pill, _) = ui.allocate_exact_size(Vec2::new(36.0, 3.0), egui::Sense::hover());
+    paint_gradient(ui.painter(), pill, VIOLET, CORAL, CORAL, VIOLET);
+    ui.add_space(6.0);
+}
+
 fn page_header(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
+    accent_pill(ui);
     ui.label(RichText::new(eyebrow).size(11.0).strong().color(CORAL));
     ui.add_space(4.0);
     ui.label(
@@ -1917,12 +1979,15 @@ fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
     } else {
         (Color32::from_rgb(58, 50, 84), Color32::from_rgb(78, 62, 90))
     };
+    // The sunset already repaints continuously, so time-based motion here costs nothing extra.
+    let time = ui.ctx().input(|input| input.time) as f32;
+    let pulse = 0.5 + 0.5 * (time * 2.0).sin();
     let painter = ui.painter();
     if enabled {
         painter.rect_filled(
             full.expand(2.0 + 4.0 * hover),
             egui::CornerRadius::same(r + 4),
-            CORAL.gamma_multiply(0.10 + 0.14 * hover),
+            CORAL.gamma_multiply(0.10 + 0.14 * hover + 0.05 * pulse),
         );
     }
     // Flat end caps keep the rounded corners; the gradient mesh fills the span between them.
@@ -1949,6 +2014,18 @@ fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
     mesh.add_triangle(0, 1, 2);
     mesh.add_triangle(0, 2, 3);
     painter.add(egui::Shape::mesh(mesh));
+    if enabled && !starting {
+        // A band of light sweeping across every few seconds, kept inside the flat-cap span.
+        let band = g.width() * 0.3;
+        let phase = (time / 3.2).fract();
+        let x0 = g.left() - band + (g.width() + band) * phase;
+        let clipped = painter.with_clip_rect(g);
+        let glint = Color32::from_white_alpha(44);
+        let first = egui::Rect::from_min_max(egui::pos2(x0, g.top()), egui::pos2(x0 + band * 0.5, g.bottom()));
+        let second = egui::Rect::from_min_max(egui::pos2(x0 + band * 0.5, g.top()), egui::pos2(x0 + band, g.bottom()));
+        paint_gradient(&clipped, first, Color32::TRANSPARENT, glint, glint, Color32::TRANSPARENT);
+        paint_gradient(&clipped, second, glint, Color32::TRANSPARENT, Color32::TRANSPARENT, glint);
+    }
     painter.rect_filled(
         egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.right(), rect.center().y)),
         egui::CornerRadius { nw: r, ne: r, sw: 0, se: 0 },
