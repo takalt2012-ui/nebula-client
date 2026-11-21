@@ -521,12 +521,12 @@ impl NebulaClient {
 
     fn topbar(&mut self, ctx: &Context) {
         egui::TopBottomPanel::top("topbar")
-            .exact_height(60.0)
+            .exact_height(68.0)
             .frame(
                 Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(27, 18, 52, 238))
-                    .inner_margin(Margin::symmetric(22, 8))
-                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(172, 133, 255, 45))),
+                    .fill(Color32::from_rgba_unmultiplied(18, 14, 36, 226))
+                    .inner_margin(Margin::symmetric(26, 10))
+                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(190, 157, 255, 70))),
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
@@ -538,7 +538,7 @@ impl NebulaClient {
                             let button = Button::new(RichText::new(label).size(14.0).strong().color(if selected { TEXT } else { MUTED }))
                                 .fill(if selected { Color32::from_rgba_unmultiplied(139, 91, 249, 185) } else { Color32::TRANSPARENT })
                                 .stroke(Stroke::new(1.0_f32, if selected { Color32::from_rgba_unmultiplied(203, 174, 255, 125) } else { Color32::TRANSPARENT }))
-                                .min_size(Vec2::new(77.0, 39.0));
+                                .min_size(Vec2::new(88.0, 42.0));
                             if ui.add(button).clicked() { self.page = page; }
                         }
                     });
@@ -564,8 +564,8 @@ impl NebulaClient {
 
     fn windowbar(&mut self, ctx: &Context) {
         egui::TopBottomPanel::top("windowbar")
-            .exact_height(42.0)
-            .frame(Frame::NONE.fill(Color32::from_rgb(87, 48, 154)).inner_margin(Margin::symmetric(14, 4)))
+            .exact_height(38.0)
+            .frame(Frame::NONE.fill(Color32::from_rgba_unmultiplied(11, 9, 25, 245)).inner_margin(Margin::symmetric(18, 3)).stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(150, 115, 210, 45)))
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     horizon_logo(ui, &self.logo, 27.0);
@@ -587,7 +587,7 @@ impl NebulaClient {
 
     fn sidebar(&mut self, ctx: &Context) {
         egui::SidePanel::left("sidebar")
-            .exact_width(104.0)
+            .exact_width(88.0)
             .frame(
                 Frame::NONE
                     .fill(Color32::from_rgba_unmultiplied(17, 15, 34, 230))
@@ -621,13 +621,13 @@ impl NebulaClient {
     }
 
     fn play_page(&mut self, ui: &mut egui::Ui, ctx: &Context) {
-        Frame::NONE.fill(Color32::from_rgba_unmultiplied(17, 13, 34, 205))
-            .stroke(Stroke::new(1.0_f32, HAIRLINE)).inner_margin(Margin::symmetric(25, 22)).show(ui, |ui| {
+        Frame::NONE.fill(Color32::from_rgba_unmultiplied(15, 11, 32, 218))
+            .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(176, 143, 255, 82))).inner_margin(Margin::symmetric(30, 26)).show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     ui.label(RichText::new("NEBULA  /  HORIZON 26.3").small().strong().color(PURPLE_BRIGHT));
                     ui.add_space(3.0);
-                    ui.label(RichText::new("Your world,\nat full speed.").font(FontId::new(34.0, FontFamily::Proportional)).strong().color(TEXT));
+                    ui.label(RichText::new("Your world,\nat full speed.").font(FontId::new(40.0, FontFamily::Proportional)).strong().color(TEXT));
                     ui.add_space(7.0);
                     ui.label(RichText::new("Native Minecraft client  ·  Rust edition").color(MUTED));
                 });
@@ -778,8 +778,9 @@ impl NebulaClient {
             .add_enabled(
                 ready,
                 Button::new(RichText::new(format!("▶   {label}")).strong().size(17.0).color(TEXT))
-                    .fill(PURPLE)
-                    .min_size(Vec2::new(290.0, 58.0)),
+                    .fill(Color32::from_rgb(119, 72, 238))
+                    .stroke(Stroke::new(1.4_f32, Color32::from_rgb(205, 177, 255)))
+                    .min_size(Vec2::new(320.0, 62.0)),
             )
             .clicked()
         {
@@ -1303,17 +1304,20 @@ fn configure_egui(ctx: &Context) {
     style.visuals.widgets.inactive.fg_stroke.color = TEXT;
     style.visuals.widgets.hovered.fg_stroke.color = TEXT;
     style.visuals.widgets.active.fg_stroke.color = TEXT;
-    style.visuals.widgets.inactive.bg_fill = Color32::from_rgba_unmultiplied(115, 69, 176, 65);
+    style.visuals.widgets.inactive.bg_fill = Color32::from_rgba_unmultiplied(94, 65, 157, 92);
     style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(204, 174, 255, 64));
-    style.visuals.widgets.hovered.bg_fill = Color32::from_rgba_unmultiplied(146, 96, 224, 110);
+    style.visuals.widgets.hovered.bg_fill = Color32::from_rgba_unmultiplied(155, 105, 255, 150);
     style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(225, 205, 255, 120));
-    style.visuals.widgets.active.bg_fill = PURPLE;
+    style.visuals.widgets.active.bg_fill = Color32::from_rgb(137, 86, 255);
+    style.visuals.widgets.active.bg_stroke = Stroke::new(1.5_f32, Color32::from_rgb(225, 205, 255));
     style.visuals.widgets.open.bg_fill = Color32::from_rgb(46, 29, 72);
     style.visuals.widgets.open.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(205, 173, 255, 90));
     style.visuals.popup_shadow = egui::epaint::Shadow { offset: [0, 10], blur: 28, spread: 0, color: Color32::from_black_alpha(130) };
-    style.spacing.combo_width = 330.0;
+    style.spacing.combo_width = 360.0;
+    style.spacing.indent = 18.0;
+    style.visuals.window_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(190, 157, 255, 95));
     style.visuals.selection.bg_fill = PURPLE;
-    style.spacing.item_spacing = Vec2::new(11.0, 12.0);
+    style.spacing.item_spacing = Vec2::new(14.0, 14.0);
     style.spacing.interact_size = Vec2::new(40.0, 36.0);
     style.spacing.button_padding = Vec2::new(14.0, 8.0);
     style.visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(10);
