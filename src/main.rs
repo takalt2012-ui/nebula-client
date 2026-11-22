@@ -5,7 +5,7 @@
 mod scene;
 
 use eframe::egui::{
-    self, Align, Button, Color32, ComboBox, Context, FontFamily, FontId, Frame, Layout, Margin,
+    self, Align, Color32, Context, FontFamily, FontId, Frame, Layout, Margin,
     RichText, Stroke, Vec2,
 };
 use serde::{Deserialize, Serialize};
@@ -771,11 +771,12 @@ impl NebulaClient {
                     );
                 });
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let can_load = self.official_launcher.is_some();
                     if ui
-                        .add_enabled(
-                            self.official_launcher.is_some(),
-                            Button::new("Load accounts"),
-                        )
+                        .add_enabled_ui(can_load, |ui| {
+                            premium_button(ui, ButtonKind::Glass, Some(Icon::User), "Load accounts", 150.0)
+                        })
+                        .inner
                         .clicked()
                     {
                         self.load_accounts();
@@ -828,7 +829,7 @@ impl NebulaClient {
         }
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            if quiet_action(ui, "↻", "Refresh builds").clicked() {
+            if premium_button(ui, ButtonKind::Ghost, Some(Icon::Refresh), "Refresh builds", 0.0).clicked() {
                 self.refresh();
                 self.status = Some(Status {
                     message: "Build list refreshed.".into(),
@@ -881,10 +882,10 @@ impl NebulaClient {
                 );
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if accent_button(ui, "Smooth, same look").clicked() {
+                    if premium_button(ui, ButtonKind::Primary, Some(Icon::Bolt), "Smooth, same look", 190.0).clicked() {
                         changes.extend(gfx.apply_smooth_same_look());
                     }
-                    if accent_button(ui, "Plain rendering").clicked() {
+                    if premium_button(ui, ButtonKind::Glass, Some(Icon::Reset), "Plain rendering", 170.0).clicked() {
                         changes.extend(gfx.apply_plain_rendering());
                     }
                 });
@@ -1184,16 +1185,10 @@ impl NebulaClient {
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if !picked.is_empty()
                             && ui
-                                .add_enabled(
-                                    !running,
-                                    Button::new(RichText::new("Disable").size(14.0).color(TEXT))
-                                        .fill(Color32::from_rgba_unmultiplied(137, 91, 231, 100))
-                                        .stroke(Stroke::new(
-                                            1.0_f32,
-                                            Color32::from_rgba_unmultiplied(204, 174, 255, 105),
-                                        ))
-                                        .min_size(Vec2::new(110.0, 38.0)),
-                                )
+                                .add_enabled_ui(!running, |ui| {
+                                    premium_button(ui, ButtonKind::Glass, Some(Icon::Power), "Disable", 120.0)
+                                })
+                                .inner
                                 .clicked()
                         {
                             self.set_picked_shader(String::new());
@@ -1251,16 +1246,10 @@ impl NebulaClient {
                             if active {
                                 ui.label(RichText::new("ENABLED").small().strong().color(SUCCESS));
                             } else if ui
-                                .add_enabled(
-                                    !running,
-                                    Button::new(RichText::new("Enable").size(14.0).color(TEXT))
-                                        .fill(Color32::from_rgba_unmultiplied(137, 91, 231, 100))
-                                        .stroke(Stroke::new(
-                                            1.0_f32,
-                                            Color32::from_rgba_unmultiplied(204, 174, 255, 105),
-                                        ))
-                                        .min_size(Vec2::new(110.0, 34.0)),
-                                )
+                                .add_enabled_ui(!running, |ui| {
+                                    premium_button(ui, ButtonKind::Primary, Some(Icon::Check), "Enable", 120.0)
+                                })
+                                .inner
                                 .clicked()
                             {
                                 enable_request = Some(pack.key.clone());
@@ -1277,7 +1266,7 @@ impl NebulaClient {
 
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            if quiet_action(ui, "↻", "Refresh packs").clicked() {
+            if premium_button(ui, ButtonKind::Ghost, Some(Icon::Refresh), "Refresh packs", 0.0).clicked() {
                 self.load_shader_state();
                 self.status = Some(Status {
                     message: format!("Found {} shader pack(s).", self.shader_packs.len()),
@@ -1532,9 +1521,13 @@ fn configure_egui(ctx: &Context) {
     style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(225, 205, 255, 120));
     style.visuals.widgets.active.bg_fill = PURPLE;
     style.visuals.widgets.open.bg_fill = Color32::from_rgb(46, 29, 72);
+    // Any stock button that slips through still gets the glass look instead of flat grey.
+    style.visuals.widgets.inactive.weak_bg_fill = Color32::from_rgba_unmultiplied(115, 69, 176, 65);
+    style.visuals.widgets.hovered.weak_bg_fill = Color32::from_rgba_unmultiplied(146, 96, 224, 110);
+    style.visuals.widgets.active.weak_bg_fill = PURPLE;
+    style.visuals.widgets.open.weak_bg_fill = Color32::from_rgb(46, 29, 72);
     style.visuals.widgets.open.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(205, 173, 255, 90));
     style.visuals.popup_shadow = egui::epaint::Shadow { offset: [0, 10], blur: 28, spread: 0, color: Color32::from_black_alpha(130) };
-    style.spacing.combo_width = 330.0;
     style.visuals.selection.bg_fill = PURPLE;
     style.spacing.item_spacing = Vec2::new(11.0, 12.0);
     style.spacing.interact_size = Vec2::new(40.0, 36.0);
@@ -1565,19 +1558,6 @@ fn horizon_logo(ui: &mut egui::Ui, texture: &egui::TextureHandle, size: f32) {
         egui::Image::new((texture.id(), Vec2::splat(size)))
             .corner_radius(egui::CornerRadius::same(8)),
     );
-}
-
-fn quiet_action(ui: &mut egui::Ui, glyph: &str, label: &str) -> egui::Response {
-    ui.add(
-        Button::new(
-            RichText::new(format!("{glyph}   {label}"))
-                .size(14.0)
-                .color(TEXT),
-        )
-        .fill(Color32::from_rgba_unmultiplied(137, 91, 231, 100))
-        .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(204, 174, 255, 105)))
-        .min_size(Vec2::new(145.0, 38.0)),
-    )
 }
 
 #[derive(Clone, Copy)]
@@ -1652,42 +1632,8 @@ fn labeled_combo<'a>(
             ui.label(RichText::new(description).small().color(MUTED));
         });
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            let selected_label = selected
-                .and_then(|index| {
-                    choices
-                        .iter()
-                        .find(|(choice, _)| *choice == index)
-                        .map(|(_, label)| *label)
-                })
-                .unwrap_or("Not found");
-            ComboBox::from_id_salt(id)
-                .selected_text(RichText::new(selected_label).size(14.0).color(TEXT))
-                .width(330.0)
-                .height(288.0)
-                .icon(|ui, rect, visuals, open, _| {
-                    let center = rect.right_center() - Vec2::new(14.0, 0.0);
-                    let offset = if open { -1.0 } else { 1.0 };
-                    let color = visuals.fg_stroke.color.gamma_multiply(0.72);
-                    ui.painter().line_segment(
-                        [center + Vec2::new(-4.0, -2.0 * offset), center + Vec2::new(0.0, 2.0 * offset)],
-                        Stroke::new(1.5_f32, color),
-                    );
-                    ui.painter().line_segment(
-                        [center + Vec2::new(0.0, 2.0 * offset), center + Vec2::new(4.0, -2.0 * offset)],
-                        Stroke::new(1.5_f32, color),
-                    );
-                })
-                .show_ui(ui, |ui| {
-                    ui.spacing_mut().interact_size.y = 36.0;
-                    ui.spacing_mut().button_padding = Vec2::new(12.0, 5.0);
-                    for (index, label) in &choices {
-                        ui.selectable_value(
-                            selected,
-                            Some(*index),
-                            RichText::new(*label).size(14.0).color(TEXT),
-                        );
-                    }
-                });
+            let width = 330.0_f32.min(ui.available_width());
+            premium_dropdown(ui, egui::Id::new(("nebula_dropdown", id)), width, &choices, selected);
         });
     });
     ui.separator();
@@ -1990,30 +1936,11 @@ fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
             CORAL.gamma_multiply(0.10 + 0.14 * hover + 0.05 * pulse),
         );
     }
-    // Flat end caps keep the rounded corners; the gradient mesh fills the span between them.
-    let mid = rect.center().x;
-    painter.rect_filled(
-        egui::Rect::from_min_max(rect.left_top(), egui::pos2(mid, rect.bottom())),
-        egui::CornerRadius { nw: r, ne: 0, sw: r, se: 0 },
-        c1,
-    );
-    painter.rect_filled(
-        egui::Rect::from_min_max(egui::pos2(mid, rect.top()), rect.right_bottom()),
-        egui::CornerRadius { nw: 0, ne: r, sw: 0, se: r },
-        c2,
-    );
+    paint_round_gradient(painter, rect, r, c1, c2, false);
     let g = egui::Rect::from_min_max(
         egui::pos2(rect.left() + r as f32, rect.top()),
         egui::pos2(rect.right() - r as f32, rect.bottom()),
     );
-    let mut mesh = egui::Mesh::default();
-    mesh.colored_vertex(g.left_top(), c1);
-    mesh.colored_vertex(g.right_top(), c2);
-    mesh.colored_vertex(g.right_bottom(), c2);
-    mesh.colored_vertex(g.left_bottom(), c1);
-    mesh.add_triangle(0, 1, 2);
-    mesh.add_triangle(0, 2, 3);
-    painter.add(egui::Shape::mesh(mesh));
     if enabled && !starting {
         // A band of light sweeping across every few seconds, kept inside the flat-cap span.
         let band = g.width() * 0.3;
@@ -2037,13 +1964,23 @@ fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
         Stroke::new(1.0_f32, Color32::from_white_alpha(if enabled { 80 } else { 24 })),
         egui::StrokeKind::Inside,
     );
-    painter.text(
-        rect.center(),
-        egui::Align2::CENTER_CENTER,
-        if starting { "Starting Horizon…" } else { "▶   Play" },
-        FontId::new(19.0, FontFamily::Proportional),
-        if enabled { Color32::WHITE } else { MUTED },
-    );
+    let font = FontId::new(19.0, FontFamily::Proportional);
+    let color = if enabled { Color32::WHITE } else { MUTED };
+    if starting {
+        painter.text(rect.center(), egui::Align2::CENTER_CENTER, "Starting Horizon…", font, color);
+    } else {
+        let text_width = painter.layout_no_wrap("Play".to_owned(), font.clone(), color).size().x;
+        let icon = 18.0;
+        let left = rect.center().x - (icon + 12.0 + text_width) / 2.0;
+        paint_icon(painter, Icon::Play, egui::pos2(left + icon / 2.0, rect.center().y), icon, color, 0.0);
+        painter.text(
+            egui::pos2(left + icon + 12.0, rect.center().y),
+            egui::Align2::LEFT_CENTER,
+            "Play",
+            font,
+            color,
+        );
+    }
     let clicked = enabled && response.clicked();
     if enabled {
         let _ = response.on_hover_cursor(egui::CursorIcon::PointingHand);
@@ -2070,6 +2007,884 @@ fn launch_progress(ui: &mut egui::Ui, time: f32) {
             lerp_color(VIOLET, CORAL, phase),
         );
     }
+}
+
+// <ui-logic>
+// Layout and keyboard arithmetic for the dropdown and segmented control. Standard library only.
+
+/// Where a dropdown list opens and how tall it may be.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct PopupPlan {
+    /// True when the list opens under its field, false when it opens above.
+    below: bool,
+    /// Total height of the list panel, padding included.
+    height: f32,
+}
+
+/// Opens below the field when the wanted height fits, otherwise on whichever side has more room,
+/// and shortens the list (it then scrolls) when neither side fits it whole.
+fn plan_popup(anchor_top: f32, anchor_bottom: f32, screen_top: f32, screen_bottom: f32, wanted: f32) -> PopupPlan {
+    const GAP: f32 = 6.0;
+    const EDGE: f32 = 12.0;
+    const FLOOR: f32 = 120.0;
+    let below_room = (screen_bottom - anchor_bottom - GAP - EDGE).max(0.0);
+    let above_room = (anchor_top - screen_top - GAP - EDGE).max(0.0);
+    let below = below_room >= wanted || below_room >= above_room;
+    let room = if below { below_room } else { above_room };
+    PopupPlan { below, height: wanted.min(room.max(FLOOR)) }
+}
+
+/// Moves the highlighted row by `delta` without wrapping. With nothing highlighted, a move down
+/// starts at the first row and a move up at the last.
+fn step_highlight(current: Option<usize>, len: usize, delta: i32) -> Option<usize> {
+    if len == 0 {
+        return None;
+    }
+    let last = len as i64 - 1;
+    Some(match current {
+        None if delta >= 0 => 0,
+        None => last as usize,
+        Some(index) => (index as i64 + delta as i64).clamp(0, last) as usize,
+    })
+}
+
+/// Width of one segment: the widest label plus padding, never narrower than a tap target and
+/// shrunk when the row would not fit in `room`.
+fn segment_width(widest_label: f32, count: usize, room: f32) -> f32 {
+    let wanted = (widest_label + 28.0).max(64.0);
+    let fit = room / count.max(1) as f32;
+    wanted.min(fit.max(40.0))
+}
+
+/// Fast start, slow finish. Input is clamped to 0..=1.
+fn ease_out_cubic(t: f32) -> f32 {
+    1.0 - (1.0 - t.clamp(0.0, 1.0)).powi(3)
+}
+// </ui-logic>
+
+// ---------------------------------------------------------------------------------------------
+// Premium controls: buttons, dropdown and segmented choice. Presentation only.
+// Inset glass wells hold values (dropdown field, choice track); raised glass triggers actions.
+// ---------------------------------------------------------------------------------------------
+
+/// Blend that also blends transparency (`lerp_color` is for opaque colours only).
+fn lerp_rgba(a: Color32, b: Color32, t: f32) -> Color32 {
+    let t = t.clamp(0.0, 1.0);
+    let (a, b) = (a.to_srgba_unmultiplied(), b.to_srgba_unmultiplied());
+    let mix = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round() as u8;
+    Color32::from_rgba_unmultiplied(mix(a[0], b[0]), mix(a[1], b[1]), mix(a[2], b[2]), mix(a[3], b[3]))
+}
+
+/// One line of text that ends in an ellipsis instead of running past `max_width`.
+fn fitted_text(
+    painter: &egui::Painter,
+    text: &str,
+    size: f32,
+    color: Color32,
+    max_width: f32,
+) -> std::sync::Arc<egui::text::Galley> {
+    let mut job = egui::text::LayoutJob::simple_singleline(
+        text.to_owned(),
+        FontId::new(size, FontFamily::Proportional),
+        color,
+    );
+    job.wrap = egui::text::TextWrapping::truncate_at_width(max_width.max(8.0));
+    painter.layout_job(job)
+}
+
+/// A horizontal or vertical gradient inside a rounded rectangle. Flat end caps carry the rounded
+/// corners and a mesh fills the span between them. Colours must be opaque so the pieces never
+/// blend over each other.
+fn paint_round_gradient(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    r: u8,
+    from: Color32,
+    to: Color32,
+    vertical: bool,
+) {
+    let rf = r as f32;
+    if vertical {
+        painter.rect_filled(
+            egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.right(), rect.top() + rf)),
+            egui::CornerRadius { nw: r, ne: r, sw: 0, se: 0 },
+            from,
+        );
+        painter.rect_filled(
+            egui::Rect::from_min_max(egui::pos2(rect.left(), rect.bottom() - rf), rect.right_bottom()),
+            egui::CornerRadius { nw: 0, ne: 0, sw: r, se: r },
+            to,
+        );
+        let span = egui::Rect::from_min_max(
+            egui::pos2(rect.left(), rect.top() + rf),
+            egui::pos2(rect.right(), rect.bottom() - rf),
+        );
+        paint_gradient(painter, span, from, from, to, to);
+    } else {
+        painter.rect_filled(
+            egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.left() + rf, rect.bottom())),
+            egui::CornerRadius { nw: r, ne: 0, sw: r, se: 0 },
+            from,
+        );
+        painter.rect_filled(
+            egui::Rect::from_min_max(egui::pos2(rect.right() - rf, rect.top()), rect.right_bottom()),
+            egui::CornerRadius { nw: 0, ne: r, sw: 0, se: r },
+            to,
+        );
+        let span = egui::Rect::from_min_max(
+            egui::pos2(rect.left() + rf, rect.top()),
+            egui::pos2(rect.right() - rf, rect.bottom()),
+        );
+        paint_gradient(painter, span, from, to, to, from);
+    }
+}
+
+/// Glyphs drawn with the painter, so they stay crisp and need no icon font.
+#[derive(Clone, Copy, PartialEq)]
+enum Icon {
+    Play,
+    Refresh,
+    Reset,
+    Bolt,
+    Power,
+    Check,
+    User,
+}
+
+fn arc_points(center: egui::Pos2, radius: f32, start: f32, sweep: f32, steps: usize) -> Vec<egui::Pos2> {
+    (0..=steps)
+        .map(|i| {
+            let (sin, cos) = (start + sweep * i as f32 / steps as f32).sin_cos();
+            center + Vec2::new(cos, sin) * radius
+        })
+        .collect()
+}
+
+fn rotated(v: Vec2, angle: f32) -> Vec2 {
+    let (sin, cos) = angle.sin_cos();
+    Vec2::new(v.x * cos - v.y * sin, v.x * sin + v.y * cos)
+}
+
+/// Draws `icon` inside a `size` square centred on `c`. `turn` (radians) spins the circular arrows.
+fn paint_icon(painter: &egui::Painter, icon: Icon, c: egui::Pos2, size: f32, color: Color32, turn: f32) {
+    let k = size / 16.0;
+    let stroke = Stroke::new(1.7 * k, color);
+    let p = |x: f32, y: f32| c + Vec2::new(x * k, y * k);
+    match icon {
+        Icon::Play => {
+            painter.add(egui::Shape::convex_polygon(
+                vec![p(-3.5, -6.0), p(-3.5, 6.0), p(6.0, 0.0)],
+                color,
+                Stroke::NONE,
+            ));
+        }
+        Icon::Refresh | Icon::Reset => {
+            let dir = if icon == Icon::Refresh { 1.0_f32 } else { -1.0 };
+            let base = if icon == Icon::Refresh { -0.87_f32 } else { -std::f32::consts::PI + 0.87 };
+            let start = base + dir * turn;
+            let sweep = dir * 4.9;
+            painter.add(egui::Shape::line(arc_points(c, 5.6 * k, start, sweep, 28), stroke));
+            let end = start + sweep;
+            let (sin, cos) = end.sin_cos();
+            let tip = c + Vec2::new(cos, sin) * 5.6 * k;
+            let forward = Vec2::new(-sin, cos) * dir;
+            let tip = tip + forward * 2.0 * k;
+            for side in [-0.6_f32, 0.6] {
+                painter.line_segment([tip, tip - rotated(forward, side) * 4.4 * k], stroke);
+            }
+        }
+        Icon::Bolt => {
+            painter.add(egui::Shape::line(
+                vec![p(2.5, -8.0), p(-4.0, 1.0), p(4.0, 1.0), p(-2.5, 8.0)],
+                stroke,
+            ));
+        }
+        Icon::Power => {
+            painter.add(egui::Shape::line(arc_points(c, 5.6 * k, -0.87, 4.9, 28), stroke));
+            painter.line_segment([p(0.0, -7.5), p(0.0, -1.0)], stroke);
+        }
+        Icon::Check => {
+            painter.add(egui::Shape::line(vec![p(-5.0, 0.5), p(-1.5, 4.0), p(5.5, -4.0)], stroke));
+        }
+        Icon::User => {
+            painter.circle_stroke(p(0.0, -3.5), 3.2 * k, stroke);
+            painter.add(egui::Shape::line(arc_points(p(0.0, 9.0), 6.8 * k, -2.55, 1.96, 14), stroke));
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum ButtonKind {
+    /// Sunset gradient: the main action of a card.
+    Primary,
+    /// Frosted violet glass: the everyday button.
+    Glass,
+    /// Text only until hovered: low-emphasis utilities.
+    Ghost,
+}
+
+const BUTTON_HEIGHT: f32 = 40.0;
+const BUTTON_RADIUS: u8 = 12;
+const BUTTON_ICON: f32 = 16.0;
+
+/// The one button style of the launcher: eased hover, press-in, light sweep, painted icon and a
+/// keyboard focus ring. Disabled looks come from the surrounding `ui` being disabled.
+fn premium_button(
+    ui: &mut egui::Ui,
+    kind: ButtonKind,
+    icon: Option<Icon>,
+    label: &str,
+    min_width: f32,
+) -> egui::Response {
+    let enabled = ui.is_enabled();
+    let font = FontId::new(14.5, FontFamily::Proportional);
+    let text_width = ui
+        .painter()
+        .layout_no_wrap(label.to_owned(), font.clone(), Color32::WHITE)
+        .size()
+        .x;
+    let icon_room = if icon.is_some() { BUTTON_ICON + 9.0 } else { 0.0 };
+    let width = (text_width + icon_room + 40.0).max(min_width);
+    let (full, response) = ui.allocate_exact_size(Vec2::new(width, BUTTON_HEIGHT), egui::Sense::click());
+    let ctx = ui.ctx().clone();
+    let hovered = enabled && response.hovered();
+    let hover = ctx.animate_bool_with_time(response.id.with("hover"), hovered, 0.14);
+    let sweep = ctx.animate_bool_with_time(response.id.with("sweep"), hovered, 0.6);
+    let pressed = enabled && response.is_pointer_button_down_on();
+    let rect = if pressed { full.shrink(1.0) } else { full };
+    let r = BUTTON_RADIUS;
+    let radius = egui::CornerRadius::same(r);
+    let rf = r as f32;
+
+    // Circular arrows nudge on hover and spin once when clicked.
+    let spin_key = response.id.with("spin");
+    let now = ctx.input(|input| input.time);
+    if enabled && response.clicked() {
+        ctx.data_mut(|data| data.insert_temp(spin_key, now));
+    }
+    let spun = ctx
+        .data(|data| data.get_temp::<f64>(spin_key))
+        .map_or(1.0, |start| ((now - start) / 0.7).clamp(0.0, 1.0) as f32);
+    let turn = hover * 0.5 + ease_out_cubic(spun) * std::f32::consts::TAU;
+
+    let painter = ui.painter();
+    let span = egui::Rect::from_min_max(
+        egui::pos2(rect.left() + rf, rect.top()),
+        egui::pos2(rect.right() - rf, rect.bottom()),
+    );
+    let text_color = match (kind, enabled) {
+        (ButtonKind::Primary, true) => Color32::WHITE,
+        (ButtonKind::Primary, false) => MUTED,
+        (ButtonKind::Glass, true) => lerp_color(Color32::from_rgb(228, 222, 244), Color32::WHITE, hover),
+        (ButtonKind::Glass, false) => MUTED.gamma_multiply(0.7),
+        (ButtonKind::Ghost, true) => lerp_color(MUTED, TEXT, hover),
+        (ButtonKind::Ghost, false) => MUTED.gamma_multiply(0.5),
+    };
+    let glint = |strength: u8| {
+        if hovered && sweep < 0.999 {
+            let band = span.width() * 0.35;
+            let x0 = span.left() - band + (span.width() + band) * ease_out_cubic(sweep);
+            let clipped = painter.with_clip_rect(span);
+            let peak = Color32::from_white_alpha(((1.0 - sweep) * strength as f32) as u8);
+            let first = egui::Rect::from_min_max(egui::pos2(x0, span.top()), egui::pos2(x0 + band * 0.5, span.bottom()));
+            let second = egui::Rect::from_min_max(egui::pos2(x0 + band * 0.5, span.top()), egui::pos2(x0 + band, span.bottom()));
+            paint_gradient(&clipped, first, Color32::TRANSPARENT, peak, peak, Color32::TRANSPARENT);
+            paint_gradient(&clipped, second, peak, Color32::TRANSPARENT, Color32::TRANSPARENT, peak);
+        }
+    };
+    let top_half = egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.right(), rect.center().y));
+    let top_corners = egui::CornerRadius { nw: r, ne: r, sw: 0, se: 0 };
+    match kind {
+        ButtonKind::Primary => {
+            if enabled {
+                painter.rect_filled(
+                    full.expand(1.0 + 3.0 * hover),
+                    egui::CornerRadius::same(r + 3),
+                    CORAL.gamma_multiply(0.10 + 0.16 * hover),
+                );
+                paint_round_gradient(
+                    painter,
+                    rect,
+                    r,
+                    lerp_color(VIOLET, Color32::from_rgb(176, 134, 255), hover),
+                    lerp_color(CORAL, Color32::from_rgb(255, 164, 122), hover),
+                    false,
+                );
+                glint(52);
+            } else {
+                paint_round_gradient(
+                    painter,
+                    rect,
+                    r,
+                    Color32::from_rgb(58, 50, 84),
+                    Color32::from_rgb(78, 62, 90),
+                    false,
+                );
+            }
+            painter.rect_filled(top_half, top_corners, Color32::from_white_alpha(if enabled { 26 } else { 10 }));
+            painter.rect_stroke(
+                rect,
+                radius,
+                Stroke::new(1.0_f32, Color32::from_white_alpha(if enabled { 84 } else { 24 })),
+                egui::StrokeKind::Inside,
+            );
+        }
+        ButtonKind::Glass => {
+            if enabled {
+                painter.rect_filled(
+                    full.translate(Vec2::new(0.0, 2.0)).expand(1.0),
+                    egui::CornerRadius::same(r + 1),
+                    Color32::from_black_alpha((34.0 + 26.0 * hover) as u8),
+                );
+                let idle = Color32::from_rgba_unmultiplied(139, 91, 249, 52);
+                let lit = Color32::from_rgba_unmultiplied(160, 112, 255, 108);
+                let fill = if pressed { Color32::from_rgba_unmultiplied(112, 70, 224, 128) } else { lerp_rgba(idle, lit, hover) };
+                painter.rect_filled(rect, radius, fill);
+                painter.rect_filled(top_half, top_corners, Color32::from_white_alpha((10.0 + 10.0 * hover) as u8));
+                glint(30);
+                painter.rect_stroke(
+                    rect,
+                    radius,
+                    Stroke::new(
+                        1.0_f32,
+                        lerp_rgba(Color32::from_white_alpha(48), Color32::from_rgba_unmultiplied(224, 204, 255, 160), hover),
+                    ),
+                    egui::StrokeKind::Inside,
+                );
+                // Lit top edge, brightest in the middle.
+                let y = rect.top() + 0.5;
+                let mid = rect.center().x;
+                let edge = Color32::from_white_alpha((70.0 + 50.0 * hover) as u8);
+                let left = egui::Rect::from_min_max(egui::pos2(span.left(), y), egui::pos2(mid, y + 1.0));
+                let right = egui::Rect::from_min_max(egui::pos2(mid, y), egui::pos2(span.right(), y + 1.0));
+                paint_gradient(painter, left, Color32::TRANSPARENT, edge, edge, Color32::TRANSPARENT);
+                paint_gradient(painter, right, edge, Color32::TRANSPARENT, Color32::TRANSPARENT, edge);
+            } else {
+                painter.rect_filled(rect, radius, Color32::from_white_alpha(8));
+                painter.rect_stroke(rect, radius, Stroke::new(1.0_f32, Color32::from_white_alpha(22)), egui::StrokeKind::Inside);
+            }
+        }
+        ButtonKind::Ghost => {
+            if hover > 0.0 {
+                painter.rect_filled(rect, radius, Color32::from_white_alpha((16.0 * hover) as u8));
+                painter.rect_stroke(
+                    rect,
+                    radius,
+                    Stroke::new(1.0_f32, Color32::from_white_alpha((34.0 * hover) as u8)),
+                    egui::StrokeKind::Inside,
+                );
+            }
+        }
+    }
+
+    let left = rect.center().x - (text_width + icon_room) / 2.0;
+    if let Some(icon) = icon {
+        paint_icon(
+            painter,
+            icon,
+            egui::pos2(left + BUTTON_ICON / 2.0, rect.center().y),
+            BUTTON_ICON,
+            text_color,
+            turn,
+        );
+    }
+    painter.text(
+        egui::pos2(left + icon_room, rect.center().y),
+        egui::Align2::LEFT_CENTER,
+        label,
+        font,
+        text_color,
+    );
+    if response.has_focus() {
+        painter.rect_stroke(
+            full.expand(2.5),
+            egui::CornerRadius::same(r + 3),
+            Stroke::new(1.5_f32, PURPLE_BRIGHT),
+            egui::StrokeKind::Outside,
+        );
+    }
+    if enabled {
+        response.on_hover_cursor(egui::CursorIcon::PointingHand)
+    } else {
+        response
+    }
+}
+
+const FIELD_HEIGHT: f32 = 42.0;
+const LIST_ROW: f32 = 38.0;
+const LIST_PAD: f32 = 6.0;
+const LIST_MAX: f32 = 300.0;
+
+/// The frosted panel behind a dropdown's list. Nearly opaque, so rows stay readable over the sunset.
+fn popup_frame() -> Frame {
+    Frame::NONE
+        .fill(Color32::from_rgba_unmultiplied(22, 15, 46, 244))
+        .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(52)))
+        .corner_radius(egui::CornerRadius::same(14))
+        .inner_margin(Margin::same(6))
+        .shadow(egui::epaint::Shadow {
+            offset: [0, 14],
+            blur: 38,
+            spread: 0,
+            color: Color32::from_black_alpha(150),
+        })
+}
+
+/// One row of a dropdown list.
+fn dropdown_row(ui: &mut egui::Ui, text: &str, selected: bool, highlighted: bool, interactive: bool) -> egui::Response {
+    // CLICK without FOCUSABLE: Tab keeps moving between fields, not through list rows.
+    let sense = if interactive { egui::Sense::CLICK } else { egui::Sense::hover() };
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), LIST_ROW), sense);
+    let hl = ui.ctx().animate_bool_with_time(response.id.with("hl"), highlighted, 0.10);
+    let painter = ui.painter();
+    let inner = rect.shrink2(Vec2::new(0.0, 1.0));
+    let radius = egui::CornerRadius::same(9);
+    if selected && hl < 1.0 {
+        painter.rect_filled(inner, radius, Color32::from_white_alpha(((1.0 - hl) * 12.0) as u8));
+    }
+    if hl > 0.0 {
+        painter.rect_filled(inner, radius, Color32::from_rgba_unmultiplied(139, 91, 249, (hl * 84.0) as u8));
+        painter.rect_stroke(
+            inner,
+            radius,
+            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(214, 190, 255, (hl * 72.0) as u8)),
+            egui::StrokeKind::Inside,
+        );
+        painter.rect_filled(
+            egui::Rect::from_min_size(inner.left_top() + Vec2::new(0.0, 10.0), Vec2::new(3.0, inner.height() - 20.0)),
+            2.0,
+            CORAL.gamma_multiply(hl),
+        );
+    }
+    let color = if selected {
+        Color32::WHITE
+    } else {
+        lerp_color(Color32::from_rgb(214, 207, 232), Color32::WHITE, hl)
+    };
+    let galley = fitted_text(painter, text, 14.5, color, inner.width() - 16.0 - 44.0);
+    painter.galley(
+        egui::pos2(inner.left() + 16.0, inner.center().y - galley.size().y / 2.0),
+        galley,
+        color,
+    );
+    if selected {
+        paint_icon(
+            painter,
+            Icon::Check,
+            egui::pos2(inner.right() - 22.0, inner.center().y),
+            15.0,
+            Color32::from_rgb(255, 164, 128),
+            0.0,
+        );
+    }
+    if interactive {
+        response.on_hover_cursor(egui::CursorIcon::PointingHand)
+    } else {
+        response
+    }
+}
+
+/// A dropdown: an inset glass field and a frosted list that eases open. Keyboard: Enter, Space or
+/// the arrow keys open it from the field; arrows, Home, End move; Enter or Space pick; Escape
+/// closes. Returns true when the pick changed.
+fn premium_dropdown(
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    width: f32,
+    choices: &[(usize, &str)],
+    selected: &mut Option<usize>,
+) -> bool {
+    let ctx = ui.ctx().clone();
+    let enabled = ui.is_enabled() && !choices.is_empty();
+    let current = *selected;
+    let selected_position = current.and_then(|value| choices.iter().position(|(index, _)| *index == value));
+    let label = if choices.is_empty() {
+        "None available"
+    } else {
+        selected_position.map_or("Not found", |position| choices[position].1)
+    };
+
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(width, FIELD_HEIGHT), egui::Sense::click());
+    let open_key = id.with("open");
+    let highlight_key = id.with("highlight");
+    let scroll_key = id.with("scroll_pending");
+    let mut open = enabled && ctx.data(|data| data.get_temp::<bool>(open_key)).unwrap_or(false);
+    let mut highlight: Option<usize> = ctx.data(|data| data.get_temp::<Option<usize>>(highlight_key)).flatten();
+    let mut changed = false;
+    let mut keep_focus = true;
+    let mut just_opened = false;
+    let mut moved_by_keys = false;
+
+    // Arrow keys and Escape belong to the field while it has focus, so focus does not wander off.
+    if enabled && response.has_focus() {
+        ctx.memory_mut(|memory| {
+            memory.set_focus_lock_filter(
+                response.id,
+                egui::EventFilter { vertical_arrows: true, escape: true, ..Default::default() },
+            )
+        });
+    }
+    let key_activate = response.has_focus()
+        && ctx.input(|input| input.key_pressed(egui::Key::Enter) || input.key_pressed(egui::Key::Space));
+    let arrow_open = enabled
+        && !open
+        && response.has_focus()
+        && ctx.input_mut(|input| {
+            let none = egui::Modifiers::NONE;
+            let down = input.consume_key(none, egui::Key::ArrowDown);
+            let up = input.consume_key(none, egui::Key::ArrowUp);
+            down || up
+        });
+    if enabled && ((response.clicked() && !(open && key_activate)) || arrow_open) {
+        open = !open;
+        if open {
+            just_opened = true;
+            highlight = selected_position.or(Some(0));
+            ctx.data_mut(|data| data.insert_temp(scroll_key, true));
+            response.request_focus();
+        } else {
+            keep_focus = false;
+        }
+    }
+
+    if open && !just_opened {
+        let (up, down, home, end, enter, space, escape, tab) = ctx.input_mut(|input| {
+            let none = egui::Modifiers::NONE;
+            (
+                input.consume_key(none, egui::Key::ArrowUp),
+                input.consume_key(none, egui::Key::ArrowDown),
+                input.consume_key(none, egui::Key::Home),
+                input.consume_key(none, egui::Key::End),
+                input.consume_key(none, egui::Key::Enter),
+                input.consume_key(none, egui::Key::Space),
+                input.consume_key(none, egui::Key::Escape),
+                input.key_pressed(egui::Key::Tab),
+            )
+        });
+        if up {
+            highlight = step_highlight(highlight, choices.len(), -1);
+        }
+        if down {
+            highlight = step_highlight(highlight, choices.len(), 1);
+        }
+        if home {
+            highlight = Some(0);
+        }
+        if end {
+            highlight = choices.len().checked_sub(1);
+        }
+        moved_by_keys = up || down || home || end;
+        if enter || space || key_activate {
+            if let Some(position) = highlight.filter(|position| *position < choices.len()) {
+                *selected = Some(choices[position].0);
+                changed = true;
+            }
+            open = false;
+        } else if escape || tab {
+            open = false;
+        }
+    }
+
+    let t = ctx.animate_bool_with_time(id.with("anim"), open, 0.16);
+    if t > 0.0 {
+        let interactive = open;
+        let fade = ease_out_cubic(t);
+        let wanted = (choices.len() as f32 * LIST_ROW + 2.0 * LIST_PAD).min(LIST_MAX + 2.0 * LIST_PAD);
+        let screen = ctx.screen_rect();
+        let plan = plan_popup(rect.top(), rect.bottom(), screen.top(), screen.bottom(), wanted);
+        let slide = (1.0 - fade) * 8.0;
+        let (pos, pivot) = if plan.below {
+            (egui::pos2(rect.left(), rect.bottom() + 6.0 - slide), egui::Align2::LEFT_TOP)
+        } else {
+            (egui::pos2(rect.left(), rect.top() - 6.0 + slide), egui::Align2::LEFT_BOTTOM)
+        };
+        let pointer_moved = ctx.input(|input| input.pointer.delta() != Vec2::ZERO);
+        let scroll_pending = ctx.data(|data| data.get_temp::<bool>(scroll_key)).unwrap_or(false);
+        let scroll_to_highlight = moved_by_keys || scroll_pending;
+        let mut clicked: Option<usize> = None;
+        let mut hovered: Option<usize> = None;
+        let area = egui::Area::new(id.with("popup"))
+            .order(egui::Order::Foreground)
+            .interactable(interactive)
+            .pivot(pivot)
+            .fixed_pos(pos)
+            .show(&ctx, |ui| {
+                ui.set_opacity(fade);
+                glass_card(ui, popup_frame(), |ui| {
+                    ui.set_width(width - 2.0 * LIST_PAD);
+                    ui.spacing_mut().item_spacing = Vec2::ZERO;
+                    egui::ScrollArea::vertical()
+                        .id_salt(id.with("scroll"))
+                        .max_height(plan.height - 2.0 * LIST_PAD)
+                        .auto_shrink([false, true])
+                        .show(ui, |ui| {
+                            for (position, (index, text)) in choices.iter().enumerate() {
+                                let row = dropdown_row(
+                                    ui,
+                                    text,
+                                    current == Some(*index),
+                                    highlight == Some(position),
+                                    interactive,
+                                );
+                                if row.hovered() {
+                                    hovered = Some(position);
+                                }
+                                if row.clicked() {
+                                    clicked = Some(position);
+                                }
+                                if scroll_to_highlight && highlight == Some(position) {
+                                    row.scroll_to_me(None);
+                                }
+                            }
+                        });
+                });
+            });
+        if scroll_pending {
+            ctx.data_mut(|data| data.insert_temp(scroll_key, false));
+        }
+        if open {
+            if let Some(position) = hovered {
+                if pointer_moved {
+                    highlight = Some(position);
+                }
+            }
+            let popup_rect = area.response.rect;
+            let pressed_outside = ctx.input(|input| {
+                input.pointer.any_pressed()
+                    && input
+                        .pointer
+                        .interact_pos()
+                        .map_or(false, |at| !popup_rect.contains(at) && !rect.contains(at))
+            });
+            if pressed_outside {
+                open = false;
+                keep_focus = false;
+            }
+            if let Some(position) = clicked {
+                *selected = Some(choices[position].0);
+                changed = true;
+                open = false;
+                keep_focus = false;
+            }
+        }
+    }
+    if !open && !keep_focus {
+        // After a mouse pick, no focus ring should linger on the field.
+        response.surrender_focus();
+    }
+    ctx.data_mut(|data| {
+        data.insert_temp(open_key, open);
+        data.insert_temp(highlight_key, highlight);
+    });
+
+    // The field itself: an inset well, a chevron chip and an open glow.
+    let hover = ctx.animate_bool_with_time(id.with("hover"), enabled && response.hovered(), 0.14);
+    let painter = ui.painter();
+    let radius = egui::CornerRadius::same(12);
+    let dim = if enabled { 1.0 } else { 0.5 };
+    if t > 0.0 {
+        painter.rect_filled(rect.expand(3.0), egui::CornerRadius::same(15), VIOLET.gamma_multiply(0.22 * t));
+    }
+    painter.rect_filled(rect, radius, Color32::from_rgba_unmultiplied(8, 5, 22, 124));
+    painter.rect_filled(rect, radius, Color32::from_white_alpha((10.0 * hover) as u8));
+    painter.rect_filled(rect, radius, VIOLET.gamma_multiply(0.16 * t));
+    let shade = Color32::from_black_alpha(64);
+    paint_gradient(
+        painter,
+        egui::Rect::from_min_max(
+            egui::pos2(rect.left() + 12.0, rect.top() + 1.0),
+            egui::pos2(rect.right() - 12.0, rect.top() + 11.0),
+        ),
+        shade,
+        shade,
+        Color32::TRANSPARENT,
+        Color32::TRANSPARENT,
+    );
+    painter.rect_stroke(
+        rect,
+        radius,
+        Stroke::new(
+            1.0_f32,
+            lerp_rgba(
+                Color32::from_white_alpha(36),
+                Color32::from_rgba_unmultiplied(198, 168, 255, 170),
+                (hover * 0.55).max(t),
+            ),
+        ),
+        egui::StrokeKind::Inside,
+    );
+    let lit = hover.max(t);
+    let text_color = lerp_color(Color32::from_rgb(226, 220, 242), Color32::WHITE, lit).gamma_multiply(dim);
+    let galley = fitted_text(painter, label, 14.5, text_color, rect.width() - 16.0 - 48.0);
+    painter.galley(
+        egui::pos2(rect.left() + 16.0, rect.center().y - galley.size().y / 2.0),
+        galley,
+        text_color,
+    );
+    let chip = egui::pos2(rect.right() - 24.0, rect.center().y);
+    painter.circle_filled(chip, 12.0, Color32::from_white_alpha((12.0 + 14.0 * hover + 16.0 * t) as u8));
+    // The chevron flips through a flat line as the list opens.
+    let flip = 1.0 - 2.0 * t;
+    painter.add(egui::Shape::line(
+        vec![
+            chip + Vec2::new(-4.0, -1.8 * flip),
+            chip + Vec2::new(0.0, 1.8 * flip),
+            chip + Vec2::new(4.0, -1.8 * flip),
+        ],
+        Stroke::new(1.7_f32, lerp_color(MUTED, TEXT, lit).gamma_multiply(dim)),
+    ));
+    if response.has_focus() && !open {
+        painter.rect_stroke(
+            rect.expand(2.5),
+            egui::CornerRadius::same(14),
+            Stroke::new(1.5_f32, PURPLE_BRIGHT),
+            egui::StrokeKind::Outside,
+        );
+    }
+    if enabled && response.hovered() {
+        ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    changed
+}
+
+const TRACK_HEIGHT: f32 = 42.0;
+const TRACK_INSET: f32 = 4.0;
+
+/// A row of mutually exclusive choices in an inset track, with a thumb that slides to the pick.
+/// Returns the value that was clicked, when it differs from `current`.
+fn segmented_control(
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    options: &[(&str, &str)],
+    current: &str,
+) -> Option<String> {
+    let ctx = ui.ctx().clone();
+    let enabled = ui.is_enabled();
+    let widest = options
+        .iter()
+        .map(|(_, label)| {
+            ui.painter()
+                .layout_no_wrap((*label).to_owned(), FontId::new(13.5, FontFamily::Proportional), Color32::WHITE)
+                .size()
+                .x
+        })
+        .fold(0.0_f32, f32::max);
+    let count = options.len().max(1);
+    let segment = segment_width(widest, count, ui.available_width() - 2.0 * TRACK_INSET);
+    let size = Vec2::new(segment * count as f32 + 2.0 * TRACK_INSET, TRACK_HEIGHT);
+    let (track, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let current_index = options.iter().position(|(value, _)| *value == current);
+
+    // One interaction area per segment. They are collected before painting so the thumb and
+    // labels can be drawn in a fixed order.
+    let responses: Vec<egui::Response> = (0..options.len())
+        .map(|i| {
+            let cell = egui::Rect::from_min_size(
+                track.left_top() + Vec2::new(TRACK_INSET + segment * i as f32, TRACK_INSET),
+                Vec2::new(segment, TRACK_HEIGHT - 2.0 * TRACK_INSET),
+            );
+            ui.interact(cell, id.with(i), egui::Sense::click())
+        })
+        .collect();
+    let hovers: Vec<f32> = responses
+        .iter()
+        .enumerate()
+        .map(|(i, response)| {
+            ctx.animate_bool_with_time(
+                response.id.with("hover"),
+                enabled && response.hovered() && current_index != Some(i),
+                0.12,
+            )
+        })
+        .collect();
+    let slot = ctx.animate_value_with_time(id.with("thumb"), current_index.unwrap_or(0) as f32, 0.2);
+    let has_pick = ctx.animate_bool_with_time(id.with("has"), current_index.is_some(), 0.15);
+    let dim = if enabled { 1.0 } else { 0.5 };
+
+    let painter = ui.painter();
+    let track_radius = egui::CornerRadius::same(13);
+    painter.rect_filled(track, track_radius, Color32::from_rgba_unmultiplied(8, 5, 22, 124));
+    let shade = Color32::from_black_alpha(64);
+    paint_gradient(
+        painter,
+        egui::Rect::from_min_max(
+            egui::pos2(track.left() + 12.0, track.top() + 1.0),
+            egui::pos2(track.right() - 12.0, track.top() + 11.0),
+        ),
+        shade,
+        shade,
+        Color32::TRANSPARENT,
+        Color32::TRANSPARENT,
+    );
+    painter.rect_stroke(track, track_radius, Stroke::new(1.0_f32, Color32::from_white_alpha(30)), egui::StrokeKind::Inside);
+    for (response, hover) in responses.iter().zip(&hovers) {
+        if *hover > 0.0 {
+            painter.rect_filled(
+                response.rect,
+                egui::CornerRadius::same(9),
+                Color32::from_white_alpha((hover * 14.0) as u8),
+            );
+        }
+    }
+    if has_pick > 0.0 {
+        let thumb = egui::Rect::from_min_size(
+            track.left_top() + Vec2::new(TRACK_INSET + segment * slot, TRACK_INSET),
+            Vec2::new(segment, TRACK_HEIGHT - 2.0 * TRACK_INSET),
+        );
+        painter.rect_filled(
+            thumb.expand(2.5),
+            egui::CornerRadius::same(12),
+            VIOLET.gamma_multiply(0.22 * has_pick * dim),
+        );
+        let (top, bottom) = if enabled {
+            (Color32::from_rgb(164, 120, 255), Color32::from_rgb(116, 70, 236))
+        } else {
+            (Color32::from_rgb(86, 70, 128), Color32::from_rgb(66, 54, 104))
+        };
+        paint_round_gradient(painter, thumb, 9, top, bottom, true);
+        painter.rect_filled(
+            egui::Rect::from_min_max(thumb.left_top(), egui::pos2(thumb.right(), thumb.center().y)),
+            egui::CornerRadius { nw: 9, ne: 9, sw: 0, se: 0 },
+            Color32::from_white_alpha(22),
+        );
+        painter.rect_stroke(
+            thumb,
+            egui::CornerRadius::same(9),
+            Stroke::new(1.0_f32, Color32::from_white_alpha(if enabled { 84 } else { 30 })),
+            egui::StrokeKind::Inside,
+        );
+    }
+    for (i, (_, label)) in options.iter().enumerate() {
+        let cell = responses[i].rect;
+        // The label brightens as the thumb slides under it.
+        let near = (1.0 - (slot - i as f32).abs()).clamp(0.0, 1.0) * has_pick;
+        let base = lerp_color(Color32::from_rgb(190, 183, 212), TEXT, hovers[i]);
+        let color = lerp_color(base, Color32::WHITE, near).gamma_multiply(dim);
+        let galley = fitted_text(painter, label, 13.5, color, cell.width() - 14.0);
+        painter.galley(
+            egui::pos2(cell.center().x - galley.size().x / 2.0, cell.center().y - galley.size().y / 2.0),
+            galley,
+            color,
+        );
+        if responses[i].has_focus() {
+            painter.rect_stroke(
+                cell,
+                egui::CornerRadius::same(9),
+                Stroke::new(1.5_f32, PURPLE_BRIGHT),
+                egui::StrokeKind::Inside,
+            );
+        }
+    }
+    let mut picked = None;
+    for (i, response) in responses.iter().enumerate() {
+        if enabled && response.hovered() {
+            ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if enabled && response.clicked() && current_index != Some(i) {
+            picked = Some(options[i].0.to_owned());
+        }
+    }
+    picked
 }
 
 // <settings-logic>
@@ -2222,33 +3037,12 @@ fn choice_row(
     options: &[(&str, &str)],
     current: &str,
 ) -> Option<String> {
-    let mut picked = None;
     ui.label(RichText::new(title).strong().color(TEXT));
     ui.label(RichText::new(description).small().color(MUTED));
     ui.add_space(2.0);
-    ui.horizontal(|ui| {
-        for (value, label) in options {
-            let selected = current == *value;
-            if ui
-                .selectable_label(selected, RichText::new(*label).size(13.5).color(TEXT))
-                .clicked()
-                && !selected
-            {
-                picked = Some((*value).to_owned());
-            }
-        }
-    });
+    let picked = segmented_control(ui, egui::Id::new(("nebula_choice", title)), options, current);
     ui.separator();
     picked
-}
-
-fn accent_button(ui: &mut egui::Ui, text: &str) -> egui::Response {
-    ui.add(
-        Button::new(RichText::new(text).size(14.0).color(TEXT))
-            .fill(Color32::from_rgba_unmultiplied(137, 91, 231, 100))
-            .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(214, 190, 255, 120)))
-            .min_size(Vec2::new(170.0, 38.0)),
-    )
 }
 
 fn discover_versions() -> Vec<HorizonVersion> {
@@ -3036,5 +3830,54 @@ mod gfx_tests {
         assert!(!g.dynamic_resolution && g.leaf_culling == "off" && g.gpu_culling == "off");
         assert!(changes.iter().any(|c| c.1 == "dynamicResolution" && c.2 == "false"));
         assert!(g.cutout_leaves, "plain rendering never touches leaf transparency");
+    }
+
+    #[test]
+    fn popup_opens_below_when_it_fits() {
+        assert_eq!(plan_popup(100.0, 142.0, 0.0, 780.0, 300.0), PopupPlan { below: true, height: 300.0 });
+    }
+
+    #[test]
+    fn popup_flips_above_when_there_is_more_room_there() {
+        assert_eq!(plan_popup(650.0, 692.0, 0.0, 780.0, 300.0), PopupPlan { below: false, height: 300.0 });
+    }
+
+    #[test]
+    fn popup_scrolls_when_neither_side_fits_it_whole() {
+        let plan = plan_popup(190.0, 232.0, 0.0, 400.0, 300.0);
+        assert!(!plan.below);
+        assert!((plan.height - 172.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn popup_never_collapses() {
+        assert_eq!(plan_popup(0.0, 42.0, 0.0, 50.0, 300.0).height, 120.0);
+        assert_eq!(plan_popup(0.0, 42.0, 0.0, 50.0, 80.0).height, 80.0);
+    }
+
+    #[test]
+    fn highlight_steps_without_wrapping() {
+        assert_eq!(step_highlight(None, 4, 1), Some(0));
+        assert_eq!(step_highlight(None, 4, -1), Some(3));
+        assert_eq!(step_highlight(Some(1), 4, 1), Some(2));
+        assert_eq!(step_highlight(Some(3), 4, 1), Some(3));
+        assert_eq!(step_highlight(Some(0), 4, -1), Some(0));
+        assert_eq!(step_highlight(Some(9), 4, 1), Some(3));
+        assert_eq!(step_highlight(Some(1), 0, 1), None);
+    }
+
+    #[test]
+    fn segments_fit_their_row() {
+        assert_eq!(segment_width(30.0, 3, 600.0), 64.0);
+        assert_eq!(segment_width(100.0, 5, 800.0), 128.0);
+        assert_eq!(segment_width(100.0, 5, 500.0), 100.0);
+        assert_eq!(segment_width(100.0, 5, 100.0), 40.0);
+    }
+
+    #[test]
+    fn easing_is_clamped() {
+        assert_eq!(ease_out_cubic(-1.0), 0.0);
+        assert_eq!(ease_out_cubic(2.0), 1.0);
+        assert!(ease_out_cubic(0.5) > 0.5);
     }
 }
