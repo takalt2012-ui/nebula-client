@@ -19,16 +19,20 @@ use std::time::{Instant, SystemTime};
 const SIDEBAR: Color32 = Color32::from_rgb(17, 15, 34);
 const BACKGROUND: Color32 = Color32::from_rgb(9, 7, 25);
 const TEXT: Color32 = Color32::from_rgb(246, 242, 255);
-const MUTED: Color32 = Color32::from_rgb(173, 166, 194);
+const MUTED: Color32 = Color32::from_rgb(204, 198, 224);
 const PURPLE: Color32 = Color32::from_rgb(123, 78, 245);
-const PURPLE_BRIGHT: Color32 = Color32::from_rgb(187, 147, 255);
+const PURPLE_BRIGHT: Color32 = Color32::from_rgb(214, 190, 255);
 const SUCCESS: Color32 = Color32::from_rgb(146, 226, 160);
-const DANGER: Color32 = Color32::from_rgb(255, 156, 171);
+const DANGER: Color32 = Color32::from_rgb(255, 172, 184);
 // Sunset-derived accents shared by the launcher chrome (the backdrop itself lives in scene.rs).
 const VIOLET: Color32 = Color32::from_rgb(143, 92, 255);
 const CORAL: Color32 = Color32::from_rgb(239, 124, 99);
+/// Coral for small text: lighter than `CORAL` so it keeps 4.5:1 contrast over the sunset glow.
+const CORAL_TEXT: Color32 = Color32::from_rgb(255, 168, 140);
 /// Opacity of the main glass panel. Lower shows more sunset, higher improves text contrast.
-const GLASS_ALPHA: u8 = 118;
+/// Opacity of the main glass panel. Higher keeps text readable over the bright sunset glow;
+/// lower shows more of the sunset. Text colours are chosen for at least 4.5:1 at this value.
+const GLASS_ALPHA: u8 = 140;
 const HUD_WIDGETS: [&str; 14] = ["effects", "items", "durability", "totems", "health", "cooldowns", "coordinates", "fps", "ping", "speed", "cps", "clock", "armor_mini", "pickups"];
 const HUD_FEATURE_LABELS: [(&str, &str); 14] = [
     ("Effects", "Potion and status effects"), ("Items", "Consumable timers"),
@@ -587,8 +591,8 @@ impl NebulaClient {
                 ui.horizontal(|ui| {
                     horizon_logo(ui, &self.logo, 28.0);
                     ui.add_space(6.0);
-                    ui.label(RichText::new("NEBULA").size(14.0).strong().color(TEXT));
-                    ui.label(RichText::new("CLIENT").size(10.5).strong().color(CORAL));
+                    ui.label(RichText::new("NEBULA").size(14.5).family(semibold()).color(TEXT));
+                    ui.label(RichText::new("CLIENT").size(12.0).family(semibold()).color(CORAL_TEXT));
                     let drag_width = (ui.available_width() - 330.0).max(24.0);
                     let (drag_rect, drag) = ui.allocate_exact_size(Vec2::new(drag_width, 34.0), egui::Sense::click_and_drag());
                     if drag.drag_started() { ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag); }
@@ -628,7 +632,7 @@ impl NebulaClient {
             )
             .show(ctx, |ui| {
                 if !compact {
-                    ui.label(RichText::new("MENU").size(10.5).strong().color(MUTED));
+                    ui.label(RichText::new("MENU").size(12.0).family(semibold()).color(MUTED));
                 }
                 ui.spacing_mut().item_spacing.y = 6.0;
                 for (page, label) in Page::ALL {
@@ -643,7 +647,7 @@ impl NebulaClient {
                             .color(MUTED),
                     );
                     if !compact {
-                        ui.label(RichText::new("Ctrl + 1-6 switches pages").size(10.5).color(MUTED));
+                        ui.label(RichText::new("Ctrl + 1-6 switches pages").size(12.0).color(MUTED));
                     }
                 });
             });
@@ -656,12 +660,11 @@ impl NebulaClient {
         ui.horizontal(|ui| {
             ui.vertical(|ui| {
                 accent_pill(ui);
-                ui.label(RichText::new("NEBULA  /  HORIZON 26.3").size(11.0).strong().color(CORAL));
+                ui.label(RichText::new("NEBULA  /  HORIZON 26.3").size(12.0).family(semibold()).color(CORAL_TEXT));
                 ui.add_space(3.0);
                 ui.label(
                     RichText::new("Your world,\nat full speed.")
-                        .font(FontId::new(36.0, FontFamily::Proportional))
-                        .strong()
+                        .font(FontId::new(36.0, semibold()))
                         .color(TEXT),
                 );
                 ui.add_space(6.0);
@@ -672,11 +675,11 @@ impl NebulaClient {
                     let (state, color) = if running {
                         ("GAME RUNNING", SUCCESS)
                     } else if starting {
-                        ("STARTING", CORAL)
+                        ("STARTING", CORAL_TEXT)
                     } else {
                         ("READY TO PLAY", PURPLE_BRIGHT)
                     };
-                    ui.label(RichText::new(state).size(11.0).strong().color(color));
+                    ui.label(RichText::new(state).size(12.0).family(semibold()).color(color));
                     ui.add_space(4.0);
                     ui.label(
                         RichText::new(
@@ -696,18 +699,18 @@ impl NebulaClient {
         let performance_changed = glass_card(ui, inner_card(false), |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
-                    ui.label(RichText::new("Performance profile").strong().color(TEXT));
+                    ui.label(RichText::new("Performance profile").family(medium()).color(TEXT));
                     ui.label(
                         RichText::new("Dedicated shader cache and optional game-scoped tweaks")
-                            .small()
+                            .size(12.5)
                             .color(MUTED),
                     );
                 });
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.label(
                         RichText::new(if self.settings.performance_mode { "ON" } else { "OFF" })
-                            .small()
-                            .strong()
+                            .size(12.5)
+                            .family(medium())
                             .color(if self.settings.performance_mode { PURPLE_BRIGHT } else { MUTED }),
                     );
                     toggle_switch(ui, &mut self.settings.performance_mode)
@@ -763,10 +766,10 @@ impl NebulaClient {
         if self.accounts.is_empty() {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
-                    ui.label(RichText::new("Account").strong().color(TEXT));
+                    ui.label(RichText::new("Account").family(medium()).color(TEXT));
                     ui.label(
                         RichText::new("A one-time sign-in session is created only when you play.")
-                            .small()
+                            .size(12.5)
                             .color(MUTED),
                     );
                 });
@@ -825,7 +828,7 @@ impl NebulaClient {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         } else if let Some(reason) = blocker {
             ui.add_space(6.0);
-            ui.label(RichText::new(reason).small().color(MUTED));
+            ui.label(RichText::new(reason).size(12.5).color(MUTED));
         }
         ui.add_space(8.0);
         ui.horizontal(|ui| {
@@ -863,7 +866,7 @@ impl NebulaClient {
         };
         let locked = game_is_running();
         if locked {
-            ui.label(RichText::new("Horizon is running. Close it to change these settings.").color(CORAL));
+            ui.label(RichText::new("Horizon is running. Close it to change these settings.").color(CORAL_TEXT));
             ui.add_space(6.0);
         }
 
@@ -871,13 +874,13 @@ impl NebulaClient {
         let culling_modes = [("off", "Off"), ("sync", "Synchronous"), ("async", "Asynchronous")];
         ui.add_enabled_ui(!locked, |ui| {
             glass_card(ui, inner_card(false), |ui| {
-                ui.label(RichText::new("QUICK SETUPS").size(11.0).strong().color(CORAL));
+                ui.label(RichText::new("QUICK SETUPS").size(12.0).family(semibold()).color(CORAL_TEXT));
                 ui.add_space(4.0);
                 ui.label(
                     RichText::new(
                         "Smooth, same look turns on Horizon's culling options, which skip drawing what you cannot see. Plain rendering returns them to Horizon's defaults. Neither touches leaf transparency.",
                     )
-                    .small()
+                    .size(12.5)
                     .color(MUTED),
                 );
                 ui.add_space(8.0);
@@ -893,7 +896,7 @@ impl NebulaClient {
             ui.add_space(12.0);
 
             glass_card(ui, inner_card(false), |ui| {
-                ui.label(RichText::new("LEAVES").size(11.0).strong().color(CORAL));
+                ui.label(RichText::new("LEAVES").size(12.0).family(semibold()).color(CORAL_TEXT));
                 ui.add_space(4.0);
                 if setting_row(
                     ui,
@@ -933,7 +936,7 @@ impl NebulaClient {
             ui.add_space(12.0);
 
             glass_card(ui, inner_card(false), |ui| {
-                ui.label(RichText::new("SMOOTHNESS").size(11.0).strong().color(CORAL));
+                ui.label(RichText::new("SMOOTHNESS").size(12.0).family(semibold()).color(CORAL_TEXT));
                 ui.add_space(4.0);
                 if setting_row(
                     ui,
@@ -988,7 +991,7 @@ impl NebulaClient {
             ui.add_space(12.0);
 
             glass_card(ui, inner_card(false), |ui| {
-                ui.label(RichText::new("FRAME-RATE SAFETY NET").size(11.0).strong().color(CORAL));
+                ui.label(RichText::new("FRAME-RATE SAFETY NET").size(12.0).family(semibold()).color(CORAL_TEXT));
                 ui.add_space(4.0);
                 if setting_row(
                     ui,
@@ -999,10 +1002,9 @@ impl NebulaClient {
                 ) {
                     changes.push((false, "dynamicResolution", gfx.dynamic_resolution.to_string()));
                 }
-                ui.label(RichText::new("Target frame rate").strong().color(TEXT));
-                let response = ui.add(egui::Slider::new(&mut gfx.target_fps, 30..=240).suffix(" fps"));
-                // Write once when the drag ends, not on every frame of it.
-                if response.drag_stopped() || (response.changed() && !response.dragged()) {
+                ui.label(RichText::new("Target frame rate").family(medium()).color(TEXT));
+                // Written once, when the drag ends or a key press settles, not on every frame of a drag.
+                if premium_slider(ui, &mut gfx.target_fps, 30..=240, " fps") {
                     changes.push((false, "targetFps", gfx.target_fps.to_string()));
                 }
             });
@@ -1036,14 +1038,24 @@ impl NebulaClient {
             "Only supported, game-scoped settings are applied. No system-wide tuning is changed.",
         );
         glass_card(ui, inner_card(false), |ui| {
-            ui.label(RichText::new("IN-GAME HUD  ·  BASIC HUD").small().strong().color(PURPLE_BRIGHT));
-            ui.label(RichText::new(if self.hud_config_path.is_some() { "These switches update the installed native mod." } else { "Basic HUD settings are not available for the selected instance." }).small().color(MUTED));
+            ui.label(RichText::new("IN-GAME HUD  ·  BASIC HUD").size(12.0).family(semibold()).color(PURPLE_BRIGHT));
+            ui.label(RichText::new(if self.hud_config_path.is_some() { "These switches update the installed native mod." } else { "Basic HUD settings are not available for the selected instance." }).size(12.5).color(MUTED));
             ui.add_space(8.0);
             egui::Grid::new("nebula_hud_features").num_columns(2).spacing([18.0, 5.0]).show(ui, |ui| {
                 for (index, (name, hint)) in HUD_FEATURE_LABELS.iter().enumerate() {
                     let mut active = self.hud_features[index];
-                    let response = ui.add_enabled(self.hud_config_path.is_some(), egui::Checkbox::new(&mut active, *name));
-                    ui.label(RichText::new(*hint).small().color(MUTED));
+                    let hud_available = self.hud_config_path.is_some();
+                    let response = ui
+                        .add_enabled_ui(hud_available, |ui| {
+                            ui.horizontal(|ui| {
+                                let switch = toggle_switch(ui, &mut active);
+                                ui.label(RichText::new(*name).family(medium()).color(TEXT));
+                                switch
+                            })
+                            .inner
+                        })
+                        .inner;
+                    ui.label(RichText::new(*hint).size(12.5).color(MUTED));
                     ui.end_row();
                     if response.changed() { self.save_hud_feature(index, active); }
                 }
@@ -1095,14 +1107,14 @@ impl NebulaClient {
         ui.add_space(16.0);
         ui.label(
             RichText::new("Advanced renderer switches")
-                .strong()
+                .family(medium())
                 .color(TEXT),
         );
         ui.label(
             RichText::new(
                 "Leave these off unless you know the active renderer benefits from them.",
             )
-            .small()
+            .size(12.5)
             .color(MUTED),
         );
         let gl_changed = setting_row(
@@ -1169,7 +1181,7 @@ impl NebulaClient {
         glass_card(ui, inner_card(false), |ui| {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(RichText::new("ACTIVE").small().strong().color(PURPLE_BRIGHT));
+                        ui.label(RichText::new("ACTIVE").size(12.0).family(semibold()).color(PURPLE_BRIGHT));
                         if picked.is_empty() {
                             ui.label(RichText::new("Shaders off (vanilla rendering)").color(TEXT));
                         } else {
@@ -1178,8 +1190,8 @@ impl NebulaClient {
                                 .find(|pack| pack.key == picked || pack.file == picked)
                                 .map(|pack| pack.title.clone())
                                 .unwrap_or_else(|| picked.clone());
-                            ui.label(RichText::new(title).strong().color(SUCCESS));
-                            ui.label(RichText::new(&picked).small().monospace().color(MUTED));
+                            ui.label(RichText::new(title).family(medium()).color(SUCCESS));
+                            ui.label(RichText::new(&picked).size(12.5).monospace().color(MUTED));
                         }
                     });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -1203,19 +1215,19 @@ impl NebulaClient {
                 ui.vertical_centered(|ui| {
                     ui.label(
                         RichText::new("Drop a shader pack here to install")
-                            .strong()
+                            .family(medium())
                             .color(TEXT),
                     );
                     ui.label(
                         RichText::new(".zip (shaders/ format) or .hshader (Horizon native)")
-                            .small()
+                            .size(12.5)
                             .color(MUTED),
                     );
                 });
             });
 
         ui.add_space(16.0);
-        ui.label(RichText::new("INSTALLED PACKS").small().strong().color(PURPLE_BRIGHT));
+        ui.label(RichText::new("INSTALLED PACKS").size(12.0).family(semibold()).color(PURPLE_BRIGHT));
         ui.add_space(6.0);
 
         if packs.is_empty() {
@@ -1231,20 +1243,20 @@ impl NebulaClient {
             glass_card(ui, inner_card(active), |ui| {
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
-                            ui.label(RichText::new(&pack.title).strong().color(TEXT));
+                            ui.label(RichText::new(&pack.title).family(medium()).color(TEXT));
                             ui.label(
                                 RichText::new(format!(
                                     "{}  ·  {}",
                                     if pack.native { "Horizon native" } else { "shaders/ format" },
                                     pack.file
                                 ))
-                                .small()
+                                .size(12.5)
                                 .color(MUTED),
                             );
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             if active {
-                                ui.label(RichText::new("ENABLED").small().strong().color(SUCCESS));
+                                ui.label(RichText::new("ENABLED").size(12.0).family(semibold()).color(SUCCESS));
                             } else if ui
                                 .add_enabled_ui(!running, |ui| {
                                     premium_button(ui, ButtonKind::Primary, Some(Icon::Check), "Enable", 120.0)
@@ -1296,7 +1308,7 @@ impl NebulaClient {
                 Some(path) => format!("Sign-in helper: {}", path.display()),
                 None => "Sign-in helper: not found".into(),
             })
-            .small()
+            .size(12.5)
             .color(MUTED),
         );
         ui.label(
@@ -1311,7 +1323,7 @@ impl NebulaClient {
         ui.add_space(18.0);
         ui.label(
             RichText::new("Horizon's sign-in helper creates a one-time session at launch. Nebula never reads or stores your credentials.")
-                .small()
+                .size(12.5)
                 .color(MUTED),
         );
         self.status_line(ui);
@@ -1489,6 +1501,14 @@ fn main() -> eframe::Result<()> {
     )
 }
 
+fn medium() -> FontFamily {
+    FontFamily::Name("Horizon Geist Medium".into())
+}
+
+fn semibold() -> FontFamily {
+    FontFamily::Name("Horizon Geist SemiBold".into())
+}
+
 fn configure_egui(ctx: &Context) {
     let mut fonts = egui::FontDefinitions::default();
     fonts.font_data.insert(
@@ -1502,6 +1522,27 @@ fn configure_egui(ctx: &Context) {
         .entry(FontFamily::Proportional)
         .or_default()
         .insert(0, "Horizon Geist".into());
+    // Medium and SemiBold weights: egui has no synthetic bold, so titles need real font files.
+    let stack = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
+    for (name, family, bytes) in [
+        (
+            "Horizon Geist Medium",
+            medium(),
+            &include_bytes!("../horizon-source/crates/horizon-theme/fonts/Geist-Medium.ttf")[..],
+        ),
+        (
+            "Horizon Geist SemiBold",
+            semibold(),
+            &include_bytes!("../horizon-source/crates/horizon-theme/fonts/Geist-SemiBold.ttf")[..],
+        ),
+    ] {
+        fonts
+            .font_data
+            .insert(name.into(), std::sync::Arc::new(egui::FontData::from_static(bytes)));
+        let mut with_fallbacks = stack.clone();
+        with_fallbacks.insert(0, name.into());
+        fonts.families.insert(family, with_fallbacks);
+    }
     ctx.set_fonts(fonts);
     let mut style = (*ctx.style()).clone();
     style.visuals = egui::Visuals::dark();
@@ -1565,6 +1606,12 @@ enum WindowAction { Minimize, Maximize, Close }
 
 fn window_control(ui: &mut egui::Ui, ctx: &Context, action: WindowAction) {
     let (rect, response) = ui.allocate_exact_size(Vec2::new(40.0, 32.0), egui::Sense::click());
+    // Icon-only controls need a name for tooltips and screen readers.
+    let response = response.on_hover_text(match action {
+        WindowAction::Minimize => "Minimize",
+        WindowAction::Maximize => "Maximize",
+        WindowAction::Close => "Close",
+    });
     let fill = match (action, response.hovered()) {
         (WindowAction::Close, true) => Color32::from_rgb(212, 70, 103),
         (_, true) => Color32::from_rgba_unmultiplied(255, 255, 255, 38),
@@ -1614,6 +1661,9 @@ fn toggle_switch(ui: &mut egui::Ui, value: &mut bool) -> egui::Response {
     let x = rect.left() + 13.0 + (rect.width() - 26.0) * t;
     ui.painter().circle_filled(egui::pos2(x, rect.center().y + 1.5), 10.0, Color32::from_black_alpha(45));
     ui.painter().circle_filled(egui::pos2(x, rect.center().y), 9.5, Color32::WHITE.gamma_multiply(dim));
+    if response.has_focus() {
+        ui.painter().rect_stroke(rect.expand(3.0), 16.0, Stroke::new(1.5_f32, PURPLE_BRIGHT), egui::StrokeKind::Outside);
+    }
     response.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
@@ -1628,8 +1678,8 @@ fn labeled_combo<'a>(
     let choices: Vec<(usize, &'a str)> = choices.into_iter().collect();
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
-            ui.label(RichText::new(title).strong().color(TEXT));
-            ui.label(RichText::new(description).small().color(MUTED));
+            ui.label(RichText::new(title).family(medium()).color(TEXT));
+            ui.label(RichText::new(description).size(12.5).color(MUTED));
         });
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             let width = 330.0_f32.min(ui.available_width());
@@ -1651,10 +1701,10 @@ fn setting_row(
             ui.vertical(|ui| {
                 ui.label(
                     RichText::new(title)
-                        .strong()
+                        .family(medium())
                         .color(if enabled { TEXT } else { MUTED }),
                 );
-                ui.label(RichText::new(description).small().color(MUTED));
+                ui.label(RichText::new(description).size(12.5).color(MUTED));
             });
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.add_enabled_ui(enabled, |ui| toggle_switch(ui, value)).inner
@@ -1668,11 +1718,11 @@ fn setting_row(
 }
 
 fn diagnostic_row(ui: &mut egui::Ui, label: &str, value: &Path) {
-    ui.label(RichText::new(label).strong().color(TEXT));
+    ui.label(RichText::new(label).family(medium()).color(TEXT));
     ui.label(
         RichText::new(value.display().to_string())
             .monospace()
-            .small()
+            .size(12.5)
             .color(MUTED),
     );
     ui.add_space(8.0);
@@ -1770,12 +1820,11 @@ fn accent_pill(ui: &mut egui::Ui) {
 
 fn page_header(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
     accent_pill(ui);
-    ui.label(RichText::new(eyebrow).size(11.0).strong().color(CORAL));
+    ui.label(RichText::new(eyebrow).size(12.0).family(semibold()).color(CORAL_TEXT));
     ui.add_space(4.0);
     ui.label(
         RichText::new(title)
-            .font(FontId::new(32.0, FontFamily::Proportional))
-            .strong()
+            .font(FontId::new(32.0, semibold()))
             .color(TEXT),
     );
     if !subtitle.is_empty() {
@@ -1808,7 +1857,7 @@ fn account_chip(ui: &mut egui::Ui, account: Option<&str>) {
                     avatar.center(),
                     egui::Align2::CENTER_CENTER,
                     initial,
-                    FontId::new(12.0, FontFamily::Proportional),
+                    FontId::new(12.0, medium()),
                     Color32::WHITE,
                 );
                 ui.label(RichText::new(account.unwrap_or("Account not loaded")).size(13.0).color(TEXT));
@@ -1845,9 +1894,12 @@ fn nav_item(ui: &mut egui::Ui, page: Page, label: &str, selected: bool, compact:
             egui::pos2(rect.left() + 50.0, rect.center().y),
             egui::Align2::LEFT_CENTER,
             label,
-            FontId::new(14.5, FontFamily::Proportional),
+            FontId::new(14.5, medium()),
             color,
         );
+    }
+    if response.has_focus() {
+        painter.rect_stroke(rect, 12.0, Stroke::new(1.5_f32, PURPLE_BRIGHT), egui::StrokeKind::Inside);
     }
     let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
     if compact {
@@ -1933,7 +1985,7 @@ fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
         painter.rect_filled(
             full.expand(2.0 + 4.0 * hover),
             egui::CornerRadius::same(r + 4),
-            CORAL.gamma_multiply(0.10 + 0.14 * hover + 0.05 * pulse),
+            CORAL.gamma_multiply(0.10 + 0.14 * hover + 0.03 * pulse),
         );
     }
     paint_round_gradient(painter, rect, r, c1, c2, false);
@@ -1944,10 +1996,10 @@ fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
     if enabled && !starting {
         // A band of light sweeping across every few seconds, kept inside the flat-cap span.
         let band = g.width() * 0.3;
-        let phase = (time / 3.2).fract();
+        let phase = (time / 5.0).fract();
         let x0 = g.left() - band + (g.width() + band) * phase;
         let clipped = painter.with_clip_rect(g);
-        let glint = Color32::from_white_alpha(44);
+        let glint = Color32::from_white_alpha(34);
         let first = egui::Rect::from_min_max(egui::pos2(x0, g.top()), egui::pos2(x0 + band * 0.5, g.bottom()));
         let second = egui::Rect::from_min_max(egui::pos2(x0 + band * 0.5, g.top()), egui::pos2(x0 + band, g.bottom()));
         paint_gradient(&clipped, first, Color32::TRANSPARENT, glint, glint, Color32::TRANSPARENT);
@@ -1964,7 +2016,7 @@ fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
         Stroke::new(1.0_f32, Color32::from_white_alpha(if enabled { 80 } else { 24 })),
         egui::StrokeKind::Inside,
     );
-    let font = FontId::new(19.0, FontFamily::Proportional);
+    let font = FontId::new(19.0, semibold());
     let color = if enabled { Color32::WHITE } else { MUTED };
     if starting {
         painter.text(rect.center(), egui::Align2::CENTER_CENTER, "Starting Horizon…", font, color);
@@ -2080,12 +2132,13 @@ fn fitted_text(
     painter: &egui::Painter,
     text: &str,
     size: f32,
+    family: FontFamily,
     color: Color32,
     max_width: f32,
 ) -> std::sync::Arc<egui::text::Galley> {
     let mut job = egui::text::LayoutJob::simple_singleline(
         text.to_owned(),
-        FontId::new(size, FontFamily::Proportional),
+        FontId::new(size, family),
         color,
     );
     job.wrap = egui::text::TextWrapping::truncate_at_width(max_width.max(8.0));
@@ -2237,7 +2290,7 @@ fn premium_button(
     min_width: f32,
 ) -> egui::Response {
     let enabled = ui.is_enabled();
-    let font = FontId::new(14.5, FontFamily::Proportional);
+    let font = FontId::new(14.5, medium());
     let text_width = ui
         .painter()
         .layout_no_wrap(label.to_owned(), font.clone(), Color32::WHITE)
@@ -2461,7 +2514,7 @@ fn dropdown_row(ui: &mut egui::Ui, text: &str, selected: bool, highlighted: bool
     } else {
         lerp_color(Color32::from_rgb(214, 207, 232), Color32::WHITE, hl)
     };
-    let galley = fitted_text(painter, text, 14.5, color, inner.width() - 16.0 - 44.0);
+    let galley = fitted_text(painter, text, 14.5, FontFamily::Proportional, color, inner.width() - 16.0 - 44.0);
     painter.galley(
         egui::pos2(inner.left() + 16.0, inner.center().y - galley.size().y / 2.0),
         galley,
@@ -2715,7 +2768,7 @@ fn premium_dropdown(
     );
     let lit = hover.max(t);
     let text_color = lerp_color(Color32::from_rgb(226, 220, 242), Color32::WHITE, lit).gamma_multiply(dim);
-    let galley = fitted_text(painter, label, 14.5, text_color, rect.width() - 16.0 - 48.0);
+    let galley = fitted_text(painter, label, 14.5, medium(), text_color, rect.width() - 16.0 - 48.0);
     painter.galley(
         egui::pos2(rect.left() + 16.0, rect.center().y - galley.size().y / 2.0),
         galley,
@@ -2747,6 +2800,122 @@ fn premium_dropdown(
     changed
 }
 
+const SLIDER_MAX_WIDTH: f32 = 380.0;
+
+/// A whole-number slider: inset rail with a sunset fill, a glowing thumb and a value chip.
+/// The value changes live while dragging. Returns true when a value is final: the pointer was
+/// released, or an arrow key was pressed (Shift moves by ten).
+fn premium_slider(
+    ui: &mut egui::Ui,
+    value: &mut u32,
+    range: std::ops::RangeInclusive<u32>,
+    suffix: &str,
+) -> bool {
+    let (low, high) = (*range.start(), *range.end());
+    let enabled = ui.is_enabled();
+    let ctx = ui.ctx().clone();
+    let chip_width = 88.0;
+    let track_width = (ui.available_width() - chip_width - 16.0).clamp(160.0, SLIDER_MAX_WIDTH);
+    let mut committed = false;
+    ui.horizontal(|ui| {
+        let (area, response) = ui.allocate_exact_size(Vec2::new(track_width, 34.0), egui::Sense::click_and_drag());
+        // The thumb stays inside the area at both ends.
+        let margin = 11.0;
+        let left = area.left() + margin;
+        let span = (area.width() - 2.0 * margin).max(1.0);
+        let steps = (high - low).max(1) as f32;
+        if enabled && (response.is_pointer_button_down_on() || response.dragged() || response.clicked()) {
+            if let Some(at) = response.interact_pointer_pos() {
+                let fraction = ((at.x - left) / span).clamp(0.0, 1.0);
+                *value = low + (fraction * steps).round() as u32;
+            }
+        }
+        if enabled && (response.drag_stopped() || response.clicked()) {
+            committed = true;
+        }
+        if enabled && response.has_focus() {
+            ctx.memory_mut(|memory| {
+                memory.set_focus_lock_filter(
+                    response.id,
+                    egui::EventFilter { horizontal_arrows: true, ..Default::default() },
+                )
+            });
+            let step: i64 = ctx.input_mut(|input| {
+                let none = egui::Modifiers::NONE;
+                let shift = egui::Modifiers::SHIFT;
+                if input.consume_key(shift, egui::Key::ArrowRight) {
+                    10
+                } else if input.consume_key(shift, egui::Key::ArrowLeft) {
+                    -10
+                } else if input.consume_key(none, egui::Key::ArrowRight) {
+                    1
+                } else if input.consume_key(none, egui::Key::ArrowLeft) {
+                    -1
+                } else {
+                    0
+                }
+            });
+            if step != 0 {
+                *value = (*value as i64 + step).clamp(low as i64, high as i64) as u32;
+                committed = true;
+            }
+        }
+        *value = (*value).clamp(low, high);
+        let hover = ctx.animate_bool_with_time(
+            response.id.with("hover"),
+            enabled && (response.hovered() || response.dragged()),
+            0.14,
+        );
+        let fraction = (*value - low) as f32 / steps;
+        let fill_end = lerp_color(VIOLET, CORAL, fraction);
+        let painter = ui.painter();
+        let rail = egui::Rect::from_min_max(
+            egui::pos2(left, area.center().y - 3.0),
+            egui::pos2(left + span, area.center().y + 3.0),
+        );
+        painter.rect_filled(rail, 3.0, Color32::from_rgba_unmultiplied(8, 5, 22, 150));
+        painter.rect_stroke(rail, 3.0, Stroke::new(1.0_f32, Color32::from_white_alpha(30)), egui::StrokeKind::Inside);
+        let thumb_x = left + span * fraction;
+        let filled = egui::Rect::from_min_max(rail.left_top(), egui::pos2(thumb_x, rail.bottom()));
+        let (from, to) = if enabled {
+            (VIOLET, fill_end)
+        } else {
+            (Color32::from_rgb(78, 66, 112), Color32::from_rgb(78, 66, 112))
+        };
+        if filled.width() > 6.5 {
+            paint_round_gradient(painter, filled, 3, from, to, false);
+        } else if filled.width() > 0.5 {
+            painter.rect_filled(filled, 3.0, from);
+        }
+        let centre = egui::pos2(thumb_x, area.center().y);
+        if enabled {
+            painter.circle_filled(centre, 12.0 + 4.0 * hover, VIOLET.gamma_multiply(0.18 + 0.18 * hover));
+        }
+        painter.circle_filled(centre + Vec2::new(0.0, 1.5), 10.0, Color32::from_black_alpha(70));
+        painter.circle_filled(centre, 9.5, if enabled { Color32::WHITE } else { Color32::from_rgb(150, 142, 172) });
+        painter.circle_filled(centre, 3.5, if enabled { fill_end } else { Color32::from_rgb(78, 66, 112) });
+        if response.has_focus() {
+            painter.circle_stroke(centre, 14.5, Stroke::new(1.5_f32, PURPLE_BRIGHT));
+        }
+        if enabled && (response.hovered() || response.dragged()) {
+            ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+
+        let (chip, _) = ui.allocate_exact_size(Vec2::new(chip_width, 30.0), egui::Sense::hover());
+        let painter = ui.painter();
+        painter.rect_filled(chip, 9.0, Color32::from_rgba_unmultiplied(8, 5, 22, 124));
+        painter.rect_stroke(chip, 9.0, Stroke::new(1.0_f32, Color32::from_white_alpha(34)), egui::StrokeKind::Inside);
+        painter.text(
+            chip.center(),
+            egui::Align2::CENTER_CENTER,
+            format!("{}{}", *value, suffix),
+            FontId::new(13.5, medium()),
+            if enabled { TEXT } else { MUTED.gamma_multiply(0.6) },
+        );
+    });
+    committed
+}
+
 const TRACK_HEIGHT: f32 = 42.0;
 const TRACK_INSET: f32 = 4.0;
 
@@ -2764,7 +2933,7 @@ fn segmented_control(
         .iter()
         .map(|(_, label)| {
             ui.painter()
-                .layout_no_wrap((*label).to_owned(), FontId::new(13.5, FontFamily::Proportional), Color32::WHITE)
+                .layout_no_wrap((*label).to_owned(), FontId::new(13.5, medium()), Color32::WHITE)
                 .size()
                 .x
         })
@@ -2860,7 +3029,7 @@ fn segmented_control(
         let near = (1.0 - (slot - i as f32).abs()).clamp(0.0, 1.0) * has_pick;
         let base = lerp_color(Color32::from_rgb(190, 183, 212), TEXT, hovers[i]);
         let color = lerp_color(base, Color32::WHITE, near).gamma_multiply(dim);
-        let galley = fitted_text(painter, label, 13.5, color, cell.width() - 14.0);
+        let galley = fitted_text(painter, label, 13.5, medium(), color, cell.width() - 14.0);
         painter.galley(
             egui::pos2(cell.center().x - galley.size().x / 2.0, cell.center().y - galley.size().y / 2.0),
             galley,
@@ -3037,8 +3206,8 @@ fn choice_row(
     options: &[(&str, &str)],
     current: &str,
 ) -> Option<String> {
-    ui.label(RichText::new(title).strong().color(TEXT));
-    ui.label(RichText::new(description).small().color(MUTED));
+    ui.label(RichText::new(title).family(medium()).color(TEXT));
+    ui.label(RichText::new(description).size(12.5).color(MUTED));
     ui.add_space(2.0);
     let picked = segmented_control(ui, egui::Id::new(("nebula_choice", title)), options, current);
     ui.separator();
@@ -3879,5 +4048,40 @@ mod gfx_tests {
         assert_eq!(ease_out_cubic(-1.0), 0.0);
         assert_eq!(ease_out_cubic(2.0), 1.0);
         assert!(ease_out_cubic(0.5) > 0.5);
+    }
+
+    /// WCAG contrast ratio of two opaque colours.
+    fn contrast(a: [u8; 3], b: [u8; 3]) -> f32 {
+        let lum = |c: [u8; 3]| {
+            let f = |v: u8| {
+                let v = v as f32 / 255.0;
+                if v <= 0.03928 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+            };
+            0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2])
+        };
+        let (a, b) = (lum(a), lum(b));
+        (a.max(b) + 0.05) / (a.min(b) + 0.05)
+    }
+
+    #[test]
+    fn text_stays_readable_over_the_brightest_sunset_glow() {
+        // Brightest sky behind the panel: the lowest sky band lit by the sun's glow.
+        let sky = [209.0_f32, 95.0, 108.0];
+        let k = GLASS_ALPHA as f32 / 255.0;
+        let glass = [16.0_f32, 11.0, 36.0];
+        // The inner card adds a faint white overlay on top of the glass.
+        let card = |c: f32| 0.047 * 255.0 + (1.0 - 0.047) * c;
+        let bg: [u8; 3] = std::array::from_fn(|i| card(glass[i] * k + sky[i] * (1.0 - k)).round() as u8);
+        for (name, color) in [
+            ("TEXT", TEXT),
+            ("MUTED", MUTED),
+            ("CORAL_TEXT", CORAL_TEXT),
+            ("PURPLE_BRIGHT", PURPLE_BRIGHT),
+            ("DANGER", DANGER),
+            ("SUCCESS", SUCCESS),
+        ] {
+            let ratio = contrast([color.r(), color.g(), color.b()], bg);
+            assert!(ratio >= 4.5, "{name} only {ratio:.2}:1");
+        }
     }
 }
