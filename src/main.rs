@@ -580,11 +580,11 @@ impl NebulaClient {
     fn windowbar(&mut self, ctx: &Context) {
         let account = self.selected_account().map(|account| account.name.clone());
         let bar = egui::TopBottomPanel::top("windowbar")
-            .exact_height(48.0)
+            .exact_height(56.0)
             .frame(
                 Frame::NONE
                     .fill(Color32::from_rgba_unmultiplied(10, 7, 24, 112))
-                    .inner_margin(Margin::symmetric(16, 7))
+                    .inner_margin(Margin::symmetric(16, 8))
                     .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 22))),
             )
             .show(ctx, |ui| {
@@ -657,41 +657,28 @@ impl NebulaClient {
         let running = game_is_running();
         let starting = self.pending_game.is_some();
 
-        ui.horizontal(|ui| {
-            ui.vertical(|ui| {
-                accent_pill(ui);
-                ui.label(RichText::new("NEBULA  /  HORIZON 26.3").size(12.0).family(semibold()).color(CORAL_TEXT));
-                ui.add_space(3.0);
-                ui.label(
-                    RichText::new("Your world,\nat full speed.")
-                        .font(FontId::new(36.0, semibold()))
-                        .color(TEXT),
-                );
-                ui.add_space(6.0);
-                ui.label(RichText::new("Native Minecraft client  ·  Rust edition").color(MUTED));
-            });
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.vertical(|ui| {
-                    let (state, color) = if running {
-                        ("GAME RUNNING", SUCCESS)
-                    } else if starting {
-                        ("STARTING", CORAL_TEXT)
-                    } else {
-                        ("READY TO PLAY", PURPLE_BRIGHT)
-                    };
-                    ui.label(RichText::new(state).size(12.0).family(semibold()).color(color));
-                    ui.add_space(4.0);
-                    ui.label(
-                        RichText::new(
-                            self.selected_version()
-                                .map(|v| v.label.as_str())
-                                .unwrap_or("No build selected"),
-                        )
-                        .color(TEXT),
-                    );
-                });
-            });
-        });
+        ui.label(RichText::new("NEBULA  /  HORIZON 26.3").size(12.0).family(semibold()).color(CORAL_TEXT));
+        ui.add_space(2.0);
+        ui.label(
+            RichText::new("Your world,\nat full speed.")
+                .font(FontId::new(40.0, semibold()))
+                .color(TEXT),
+        );
+        ui.add_space(2.0);
+        ui.label(RichText::new("Native Minecraft client  ·  Rust edition").color(MUTED));
+        ui.add_space(8.0);
+        let (state, color) = if running {
+            ("Game running", SUCCESS)
+        } else if starting {
+            ("Starting", CORAL_TEXT)
+        } else {
+            ("Ready to play", PURPLE_BRIGHT)
+        };
+        let build = self
+            .selected_version()
+            .map(|version| version.label.clone())
+            .unwrap_or_else(|| "No build selected".to_owned());
+        status_chip(ui, state, color, &build);
         ui.add_space(16.0);
         ui.separator();
         ui.add_space(8.0);
@@ -699,6 +686,7 @@ impl NebulaClient {
         let performance_changed = glass_card(ui, inner_card(false), |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 3.0;
                     ui.label(RichText::new("Performance profile").family(medium()).color(TEXT));
                     ui.label(
                         RichText::new("Dedicated shader cache and optional game-scoped tweaks")
@@ -766,6 +754,7 @@ impl NebulaClient {
         if self.accounts.is_empty() {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 3.0;
                     ui.label(RichText::new("Account").family(medium()).color(TEXT));
                     ui.label(
                         RichText::new("A one-time sign-in session is created only when you play.")
@@ -1570,7 +1559,7 @@ fn configure_egui(ctx: &Context) {
     style.visuals.widgets.open.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(205, 173, 255, 90));
     style.visuals.popup_shadow = egui::epaint::Shadow { offset: [0, 10], blur: 28, spread: 0, color: Color32::from_black_alpha(130) };
     style.visuals.selection.bg_fill = PURPLE;
-    style.spacing.item_spacing = Vec2::new(11.0, 12.0);
+    style.spacing.item_spacing = Vec2::new(10.0, 8.0);
     style.spacing.interact_size = Vec2::new(40.0, 36.0);
     style.spacing.button_padding = Vec2::new(14.0, 8.0);
     style.visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(10);
@@ -1678,6 +1667,7 @@ fn labeled_combo<'a>(
     let choices: Vec<(usize, &'a str)> = choices.into_iter().collect();
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = 3.0;
             ui.label(RichText::new(title).family(medium()).color(TEXT));
             ui.label(RichText::new(description).size(12.5).color(MUTED));
         });
@@ -1699,6 +1689,7 @@ fn setting_row(
     let changed = ui
         .horizontal(|ui| {
             ui.vertical(|ui| {
+                ui.spacing_mut().item_spacing.y = 3.0;
                 ui.label(
                     RichText::new(title)
                         .family(medium())
@@ -1743,14 +1734,14 @@ fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
 fn glass_frame(alpha: u8) -> Frame {
     Frame::NONE
         .fill(Color32::from_rgba_unmultiplied(16, 11, 36, alpha))
-        .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(34)))
-        .corner_radius(egui::CornerRadius::same(18))
+        .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(26)))
+        .corner_radius(egui::CornerRadius::same(16))
         .inner_margin(Margin::symmetric(28, 24))
         .shadow(egui::epaint::Shadow {
-            offset: [0, 10],
-            blur: 30,
+            offset: [0, 8],
+            blur: 24,
             spread: 0,
-            color: Color32::from_black_alpha(70),
+            color: Color32::from_black_alpha(60),
         })
 }
 
@@ -1786,40 +1777,12 @@ fn paint_gradient(painter: &egui::Painter, rect: egui::Rect, tl: Color32, tr: Co
     painter.add(egui::Shape::mesh(mesh));
 }
 
-/// Shows `frame` around the contents, then adds a soft sheen and a lit top edge so it reads as glass.
+/// Shows `frame` around the contents. Kept as one call site so every panel and popup shares it.
 fn glass_card<R>(ui: &mut egui::Ui, frame: Frame, add_contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
-    let output = frame.show(ui, add_contents);
-    let rect = output.response.rect;
-    let painter = ui.painter();
-    // Sheen fading down from the top edge, inset so it never pokes past the rounded corners.
-    if rect.width() > 60.0 && rect.height() > 40.0 {
-        let sheen = egui::Rect::from_min_max(
-            rect.left_top() + Vec2::new(18.0, 1.0),
-            egui::pos2(rect.right() - 18.0, rect.top() + (rect.height() * 0.4).min(64.0)),
-        );
-        let top = Color32::from_white_alpha(16);
-        paint_gradient(painter, sheen, top, top, Color32::TRANSPARENT, Color32::TRANSPARENT);
-        // Top edge light, brightest in the middle.
-        let y = rect.top() + 0.5;
-        let mid = rect.center().x;
-        let edge = Color32::from_white_alpha(70);
-        let left = egui::Rect::from_min_max(egui::pos2(rect.left() + 18.0, y), egui::pos2(mid, y + 1.0));
-        let right = egui::Rect::from_min_max(egui::pos2(mid, y), egui::pos2(rect.right() - 18.0, y + 1.0));
-        paint_gradient(painter, left, Color32::TRANSPARENT, edge, edge, Color32::TRANSPARENT);
-        paint_gradient(painter, right, edge, Color32::TRANSPARENT, Color32::TRANSPARENT, edge);
-    }
-    output.inner
-}
-
-/// A short violet-to-coral bar used as a section mark.
-fn accent_pill(ui: &mut egui::Ui) {
-    let (pill, _) = ui.allocate_exact_size(Vec2::new(36.0, 3.0), egui::Sense::hover());
-    paint_gradient(ui.painter(), pill, VIOLET, CORAL, CORAL, VIOLET);
-    ui.add_space(6.0);
+    frame.show(ui, add_contents).inner
 }
 
 fn page_header(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
-    accent_pill(ui);
     ui.label(RichText::new(eyebrow).size(12.0).family(semibold()).color(CORAL_TEXT));
     ui.add_space(4.0);
     ui.label(
@@ -1840,17 +1803,17 @@ fn account_chip(ui: &mut egui::Ui, account: Option<&str>) {
         .fill(Color32::from_white_alpha(16))
         .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(34)))
         .corner_radius(egui::CornerRadius::same(16))
-        .inner_margin(Margin::symmetric(10, 4))
+        .inner_margin(Margin::symmetric(10, 3))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                let (avatar, _) = ui.allocate_exact_size(Vec2::splat(22.0), egui::Sense::hover());
+                let (avatar, _) = ui.allocate_exact_size(Vec2::splat(20.0), egui::Sense::hover());
                 let initial = account
                     .and_then(|name| name.chars().next())
                     .map(|c| c.to_uppercase().to_string())
                     .unwrap_or_else(|| "?".to_string());
                 ui.painter().circle_filled(
                     avatar.center(),
-                    11.0,
+                    10.0,
                     if account.is_some() { VIOLET } else { Color32::from_rgb(70, 62, 96) },
                 );
                 ui.painter().text(
@@ -1865,21 +1828,33 @@ fn account_chip(ui: &mut egui::Ui, account: Option<&str>) {
         });
 }
 
+/// A quiet status pill: a coloured dot, the state and the selected build.
+fn status_chip(ui: &mut egui::Ui, state: &str, color: Color32, detail: &str) {
+    Frame::NONE
+        .fill(Color32::from_white_alpha(12))
+        .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(26)))
+        .corner_radius(egui::CornerRadius::same(14))
+        .inner_margin(Margin::symmetric(12, 5))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                let (dot, _) = ui.allocate_exact_size(Vec2::splat(8.0), egui::Sense::hover());
+                ui.painter().circle_filled(dot.center(), 4.0, color);
+                ui.label(RichText::new(state).size(13.0).family(medium()).color(TEXT));
+                ui.label(RichText::new("·").size(13.0).color(MUTED));
+                ui.label(RichText::new(detail).size(13.0).color(MUTED));
+            });
+        });
+}
+
 /// One sidebar destination: painted icon, label, animated hover and selection states.
 fn nav_item(ui: &mut egui::Ui, page: Page, label: &str, selected: bool, compact: bool) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 44.0), egui::Sense::click());
     let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered(), 0.12);
     let active = ui.ctx().animate_bool_with_time(response.id.with("active"), selected, 0.18);
     let painter = ui.painter();
-    painter.rect_filled(rect, 12.0, Color32::from_white_alpha((hover * 16.0) as u8));
+    painter.rect_filled(rect, 10.0, Color32::from_white_alpha((hover * 10.0) as u8));
     if active > 0.0 {
-        painter.rect_filled(rect, 12.0, Color32::from_rgba_unmultiplied(139, 91, 249, (active * 110.0) as u8));
-        painter.rect_stroke(
-            rect,
-            12.0,
-            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(214, 190, 255, (active * 100.0) as u8)),
-            egui::StrokeKind::Inside,
-        );
+        painter.rect_filled(rect, 10.0, Color32::from_rgba_unmultiplied(139, 91, 249, (active * 70.0) as u8));
         painter.rect_filled(
             egui::Rect::from_min_size(rect.left_top() + Vec2::new(0.0, 12.0), Vec2::new(3.0, 20.0)),
             2.0,
@@ -1963,66 +1938,41 @@ fn draw_nav_icon(painter: &egui::Painter, page: Page, c: egui::Pos2, color: Colo
 /// The primary call to action: a violet-to-coral sunset gradient with a soft glow.
 /// Returns true when it was clicked while enabled.
 fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
-    let size = Vec2::new(ui.available_width().min(360.0), 62.0);
+    let size = Vec2::new(ui.available_width().min(340.0), 56.0);
     let (full, response) = ui.allocate_exact_size(size, egui::Sense::click());
     let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered() && enabled, 0.15);
     let pressed = enabled && response.is_pointer_button_down_on();
-    let rect = if pressed { full.shrink(1.5) } else { full };
-    let r: u8 = 16;
-    let (c1, c2) = if enabled {
-        (
-            lerp_color(VIOLET, Color32::from_rgb(172, 128, 255), hover),
-            lerp_color(CORAL, Color32::from_rgb(255, 160, 118), hover),
-        )
+    let rect = if pressed { full.shrink(1.0) } else { full };
+    let radius = egui::CornerRadius::same(14);
+    // White text needs 4.5:1, so the fill stays a deep violet even when hovered.
+    let fill = if !enabled {
+        Color32::from_rgb(52, 46, 76)
+    } else if pressed {
+        Color32::from_rgb(98, 60, 205)
     } else {
-        (Color32::from_rgb(58, 50, 84), Color32::from_rgb(78, 62, 90))
+        lerp_color(Color32::from_rgb(112, 70, 228), PURPLE, hover)
     };
-    // The sunset already repaints continuously, so time-based motion here costs nothing extra.
-    let time = ui.ctx().input(|input| input.time) as f32;
-    let pulse = 0.5 + 0.5 * (time * 2.0).sin();
     let painter = ui.painter();
     if enabled {
-        painter.rect_filled(
-            full.expand(2.0 + 4.0 * hover),
-            egui::CornerRadius::same(r + 4),
-            CORAL.gamma_multiply(0.10 + 0.14 * hover + 0.03 * pulse),
+        // A soft violet glow under the button, a little stronger on hover.
+        painter.add(
+            egui::epaint::Shadow {
+                offset: [0, 8],
+                blur: 24,
+                spread: 0,
+                color: VIOLET.gamma_multiply(0.30 + 0.20 * hover),
+            }
+            .as_shape(rect, radius),
         );
     }
-    paint_round_gradient(painter, rect, r, c1, c2, false);
-    let g = egui::Rect::from_min_max(
-        egui::pos2(rect.left() + r as f32, rect.top()),
-        egui::pos2(rect.right() - r as f32, rect.bottom()),
-    );
-    if enabled && !starting {
-        // A band of light sweeping across every few seconds, kept inside the flat-cap span.
-        let band = g.width() * 0.3;
-        let phase = (time / 5.0).fract();
-        let x0 = g.left() - band + (g.width() + band) * phase;
-        let clipped = painter.with_clip_rect(g);
-        let glint = Color32::from_white_alpha(34);
-        let first = egui::Rect::from_min_max(egui::pos2(x0, g.top()), egui::pos2(x0 + band * 0.5, g.bottom()));
-        let second = egui::Rect::from_min_max(egui::pos2(x0 + band * 0.5, g.top()), egui::pos2(x0 + band, g.bottom()));
-        paint_gradient(&clipped, first, Color32::TRANSPARENT, glint, glint, Color32::TRANSPARENT);
-        paint_gradient(&clipped, second, glint, Color32::TRANSPARENT, Color32::TRANSPARENT, glint);
-    }
-    painter.rect_filled(
-        egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.right(), rect.center().y)),
-        egui::CornerRadius { nw: r, ne: r, sw: 0, se: 0 },
-        Color32::from_white_alpha(if enabled { 28 } else { 10 }),
-    );
-    painter.rect_stroke(
-        rect,
-        egui::CornerRadius::same(r),
-        Stroke::new(1.0_f32, Color32::from_white_alpha(if enabled { 80 } else { 24 })),
-        egui::StrokeKind::Inside,
-    );
-    let font = FontId::new(19.0, semibold());
-    let color = if enabled { Color32::WHITE } else { MUTED };
+    painter.rect_filled(rect, radius, fill);
+    let font = FontId::new(18.0, semibold());
+    let color = if enabled { Color32::WHITE } else { MUTED.gamma_multiply(0.7) };
     if starting {
         painter.text(rect.center(), egui::Align2::CENTER_CENTER, "Starting Horizon…", font, color);
     } else {
         let text_width = painter.layout_no_wrap("Play".to_owned(), font.clone(), color).size().x;
-        let icon = 18.0;
+        let icon = 16.0;
         let left = rect.center().x - (icon + 12.0 + text_width) / 2.0;
         paint_icon(painter, Icon::Play, egui::pos2(left + icon / 2.0, rect.center().y), icon, color, 0.0);
         painter.text(
@@ -2277,7 +2227,7 @@ enum ButtonKind {
 }
 
 const BUTTON_HEIGHT: f32 = 40.0;
-const BUTTON_RADIUS: u8 = 12;
+const BUTTON_RADIUS: u8 = 10;
 const BUTTON_ICON: f32 = 16.0;
 
 /// The one button style of the launcher: eased hover, press-in, light sweep, painted icon and a
@@ -2302,12 +2252,10 @@ fn premium_button(
     let ctx = ui.ctx().clone();
     let hovered = enabled && response.hovered();
     let hover = ctx.animate_bool_with_time(response.id.with("hover"), hovered, 0.14);
-    let sweep = ctx.animate_bool_with_time(response.id.with("sweep"), hovered, 0.6);
     let pressed = enabled && response.is_pointer_button_down_on();
     let rect = if pressed { full.shrink(1.0) } else { full };
     let r = BUTTON_RADIUS;
     let radius = egui::CornerRadius::same(r);
-    let rf = r as f32;
 
     // Circular arrows nudge on hover and spin once when clicked.
     let spin_key = response.id.with("spin");
@@ -2321,111 +2269,45 @@ fn premium_button(
     let turn = hover * 0.5 + ease_out_cubic(spun) * std::f32::consts::TAU;
 
     let painter = ui.painter();
-    let span = egui::Rect::from_min_max(
-        egui::pos2(rect.left() + rf, rect.top()),
-        egui::pos2(rect.right() - rf, rect.bottom()),
-    );
     let text_color = match (kind, enabled) {
         (ButtonKind::Primary, true) => Color32::WHITE,
-        (ButtonKind::Primary, false) => MUTED,
-        (ButtonKind::Glass, true) => lerp_color(Color32::from_rgb(228, 222, 244), Color32::WHITE, hover),
-        (ButtonKind::Glass, false) => MUTED.gamma_multiply(0.7),
+        (ButtonKind::Glass, true) => TEXT,
         (ButtonKind::Ghost, true) => lerp_color(MUTED, TEXT, hover),
         (ButtonKind::Ghost, false) => MUTED.gamma_multiply(0.5),
+        (_, false) => MUTED.gamma_multiply(0.7),
     };
-    let glint = |strength: u8| {
-        if hovered && sweep < 0.999 {
-            let band = span.width() * 0.35;
-            let x0 = span.left() - band + (span.width() + band) * ease_out_cubic(sweep);
-            let clipped = painter.with_clip_rect(span);
-            let peak = Color32::from_white_alpha(((1.0 - sweep) * strength as f32) as u8);
-            let first = egui::Rect::from_min_max(egui::pos2(x0, span.top()), egui::pos2(x0 + band * 0.5, span.bottom()));
-            let second = egui::Rect::from_min_max(egui::pos2(x0 + band * 0.5, span.top()), egui::pos2(x0 + band, span.bottom()));
-            paint_gradient(&clipped, first, Color32::TRANSPARENT, peak, peak, Color32::TRANSPARENT);
-            paint_gradient(&clipped, second, peak, Color32::TRANSPARENT, Color32::TRANSPARENT, peak);
-        }
-    };
-    let top_half = egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.right(), rect.center().y));
-    let top_corners = egui::CornerRadius { nw: r, ne: r, sw: 0, se: 0 };
     match kind {
+        // White text needs 4.5:1, so the primary fill stays a deep violet even when hovered.
         ButtonKind::Primary => {
-            if enabled {
-                painter.rect_filled(
-                    full.expand(1.0 + 3.0 * hover),
-                    egui::CornerRadius::same(r + 3),
-                    CORAL.gamma_multiply(0.10 + 0.16 * hover),
-                );
-                paint_round_gradient(
-                    painter,
-                    rect,
-                    r,
-                    lerp_color(VIOLET, Color32::from_rgb(176, 134, 255), hover),
-                    lerp_color(CORAL, Color32::from_rgb(255, 164, 122), hover),
-                    false,
-                );
-                glint(52);
+            let fill = if !enabled {
+                Color32::from_rgb(52, 46, 76)
+            } else if pressed {
+                Color32::from_rgb(98, 60, 205)
             } else {
-                paint_round_gradient(
-                    painter,
-                    rect,
-                    r,
-                    Color32::from_rgb(58, 50, 84),
-                    Color32::from_rgb(78, 62, 90),
-                    false,
-                );
-            }
-            painter.rect_filled(top_half, top_corners, Color32::from_white_alpha(if enabled { 26 } else { 10 }));
+                lerp_color(Color32::from_rgb(112, 70, 228), PURPLE, hover)
+            };
+            painter.rect_filled(rect, radius, fill);
+        }
+        ButtonKind::Glass => {
+            let (fill, edge) = if enabled {
+                (
+                    (14.0 + 14.0 * hover + if pressed { 6.0 } else { 0.0 }) as u8,
+                    (38.0 + 30.0 * hover) as u8,
+                )
+            } else {
+                (8, 20)
+            };
+            painter.rect_filled(rect, radius, Color32::from_white_alpha(fill));
             painter.rect_stroke(
                 rect,
                 radius,
-                Stroke::new(1.0_f32, Color32::from_white_alpha(if enabled { 84 } else { 24 })),
+                Stroke::new(1.0_f32, Color32::from_white_alpha(edge)),
                 egui::StrokeKind::Inside,
             );
         }
-        ButtonKind::Glass => {
-            if enabled {
-                painter.rect_filled(
-                    full.translate(Vec2::new(0.0, 2.0)).expand(1.0),
-                    egui::CornerRadius::same(r + 1),
-                    Color32::from_black_alpha((34.0 + 26.0 * hover) as u8),
-                );
-                let idle = Color32::from_rgba_unmultiplied(139, 91, 249, 52);
-                let lit = Color32::from_rgba_unmultiplied(160, 112, 255, 108);
-                let fill = if pressed { Color32::from_rgba_unmultiplied(112, 70, 224, 128) } else { lerp_rgba(idle, lit, hover) };
-                painter.rect_filled(rect, radius, fill);
-                painter.rect_filled(top_half, top_corners, Color32::from_white_alpha((10.0 + 10.0 * hover) as u8));
-                glint(30);
-                painter.rect_stroke(
-                    rect,
-                    radius,
-                    Stroke::new(
-                        1.0_f32,
-                        lerp_rgba(Color32::from_white_alpha(48), Color32::from_rgba_unmultiplied(224, 204, 255, 160), hover),
-                    ),
-                    egui::StrokeKind::Inside,
-                );
-                // Lit top edge, brightest in the middle.
-                let y = rect.top() + 0.5;
-                let mid = rect.center().x;
-                let edge = Color32::from_white_alpha((70.0 + 50.0 * hover) as u8);
-                let left = egui::Rect::from_min_max(egui::pos2(span.left(), y), egui::pos2(mid, y + 1.0));
-                let right = egui::Rect::from_min_max(egui::pos2(mid, y), egui::pos2(span.right(), y + 1.0));
-                paint_gradient(painter, left, Color32::TRANSPARENT, edge, edge, Color32::TRANSPARENT);
-                paint_gradient(painter, right, edge, Color32::TRANSPARENT, Color32::TRANSPARENT, edge);
-            } else {
-                painter.rect_filled(rect, radius, Color32::from_white_alpha(8));
-                painter.rect_stroke(rect, radius, Stroke::new(1.0_f32, Color32::from_white_alpha(22)), egui::StrokeKind::Inside);
-            }
-        }
         ButtonKind::Ghost => {
             if hover > 0.0 {
-                painter.rect_filled(rect, radius, Color32::from_white_alpha((16.0 * hover) as u8));
-                painter.rect_stroke(
-                    rect,
-                    radius,
-                    Stroke::new(1.0_f32, Color32::from_white_alpha((34.0 * hover) as u8)),
-                    egui::StrokeKind::Inside,
-                );
+                painter.rect_filled(rect, radius, Color32::from_white_alpha((14.0 * hover) as u8));
             }
         }
     }
@@ -3000,28 +2882,8 @@ fn segmented_control(
             track.left_top() + Vec2::new(TRACK_INSET + segment * slot, TRACK_INSET),
             Vec2::new(segment, TRACK_HEIGHT - 2.0 * TRACK_INSET),
         );
-        painter.rect_filled(
-            thumb.expand(2.5),
-            egui::CornerRadius::same(12),
-            VIOLET.gamma_multiply(0.22 * has_pick * dim),
-        );
-        let (top, bottom) = if enabled {
-            (Color32::from_rgb(164, 120, 255), Color32::from_rgb(116, 70, 236))
-        } else {
-            (Color32::from_rgb(86, 70, 128), Color32::from_rgb(66, 54, 104))
-        };
-        paint_round_gradient(painter, thumb, 9, top, bottom, true);
-        painter.rect_filled(
-            egui::Rect::from_min_max(thumb.left_top(), egui::pos2(thumb.right(), thumb.center().y)),
-            egui::CornerRadius { nw: 9, ne: 9, sw: 0, se: 0 },
-            Color32::from_white_alpha(22),
-        );
-        painter.rect_stroke(
-            thumb,
-            egui::CornerRadius::same(9),
-            Stroke::new(1.0_f32, Color32::from_white_alpha(if enabled { 84 } else { 30 })),
-            egui::StrokeKind::Inside,
-        );
+        let fill = if enabled { Color32::from_rgb(112, 70, 228) } else { Color32::from_rgb(70, 58, 108) };
+        painter.rect_filled(thumb, egui::CornerRadius::same(9), fill);
     }
     for (i, (_, label)) in options.iter().enumerate() {
         let cell = responses[i].rect;
@@ -3206,8 +3068,11 @@ fn choice_row(
     options: &[(&str, &str)],
     current: &str,
 ) -> Option<String> {
-    ui.label(RichText::new(title).family(medium()).color(TEXT));
-    ui.label(RichText::new(description).size(12.5).color(MUTED));
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 3.0;
+        ui.label(RichText::new(title).family(medium()).color(TEXT));
+        ui.label(RichText::new(description).size(12.5).color(MUTED));
+    });
     ui.add_space(2.0);
     let picked = segmented_control(ui, egui::Id::new(("nebula_choice", title)), options, current);
     ui.separator();
