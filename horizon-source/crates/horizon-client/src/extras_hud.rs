@@ -8,7 +8,7 @@ use crate::{
 use horizon_hooks::hud;
 
 /// The gap between an overlay and the screen edge or the next overlay.
-const MARGIN: f32 = 2.0;
+const MARGIN: f32 = 3.0;
 const BACKGROUND: u32 = 0x7800_0000;
 
 /// Where the next overlay goes in each corner.
@@ -102,6 +102,8 @@ pub fn draw_minimap(
 }
 
 /// A box of text lines (a mod's HUD panel): `(text, 0xRRGGBB)` each.
+/// Draw a compact, Lunar-inspired panel for a mod's HUD lines. Geometry is
+/// emitted into the existing HUD batch; no per-frame textures or render passes.
 pub fn draw_lines(
     batch: &mut HudBatch,
     atlas: &HudAtlas,
@@ -112,18 +114,29 @@ pub fn draw_lines(
     if lines.is_empty() {
         return;
     }
-    let w = lines
+
+    const PAD_X: f32 = 6.0;
+    const PAD_Y: f32 = 3.0;
+    const LINE_HEIGHT: f32 = 11.0;
+
+    let text_width = lines
         .iter()
         .map(|(text, _)| HudBatch::text_width(atlas, text))
-        .fold(0.0, f32::max)
-        + 4.0;
-    let h = 10.0 * lines.len() as f32 + 2.0;
-    let (x, y) = corners.place(corner, w, h);
-    batch.fill(atlas, x, y, w, h, BACKGROUND);
-    for (i, (text, color)) in lines.iter().enumerate() {
+        .fold(0.0, f32::max);
+    let width = text_width + PAD_X * 2.0;
+    let height = LINE_HEIGHT * lines.len() as f32 + PAD_Y * 2.0;
+    let (x, y) = corners.place(corner, width, height);
+
+    batch.fill(atlas, x + 1.0, y + 2.0, width, height, rgba(0, 0, 0, 72));
+    batch.fill(atlas, x, y, width, height, rgba(15, 21, 31, 218));
+    batch.fill(atlas, x, y, width, 1.0, rgba(122, 151, 190, 92));
+    batch.fill(atlas, x, y, 2.0, height, rgba(79, 154, 255, 210));
+    batch.fill(atlas, x + width - 1.0, y, 1.0, height, rgba(122, 151, 190, 52));
+
+    for (index, (text, color)) in lines.iter().enumerate() {
         let [_, r, g, b] = color.to_be_bytes();
-        let y = y + 2.0 + 10.0 * i as f32;
-        batch.text(atlas, text, x + 2.0, y, rgba(r, g, b, 255), true);
+        let line_y = y + PAD_Y + LINE_HEIGHT * index as f32;
+        batch.text(atlas, text, x + PAD_X, line_y, rgba(r, g, b, 255), true);
     }
 }
 
