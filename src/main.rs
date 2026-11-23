@@ -47,7 +47,7 @@ enum Page {
 }
 
 impl Page {
-    const ALL: [(Self, &'static str); 5] = [
+    const ALL: [(Self, &'static str); 6] = [
         (Self::Play, "Home"),
         (Self::Performance, "Mods"),
         (Self::Shaders, "Shaders"),
@@ -484,11 +484,14 @@ impl NebulaClient {
                 painter.rect_stroke(sample, 5.0, Stroke::new(1.0, Color32::from_rgb(77, 145, 255)), egui::StrokeKind::Inside);
                 painter.text(sample.center(), egui::Align2::CENTER_CENTER, HUD_FEATURE_LABELS[selected].0, FontId::proportional(12.0 * factor), TEXT);
                 ui.add_space(10.0);
-                let mut changed = false;
-                changed |= ui.add(egui::Slider::new(&mut self.hud_layout[selected][0], 0.03..=0.97).text("Horizontal")).changed();
-                changed |= ui.add(egui::Slider::new(&mut self.hud_layout[selected][1], 0.12..=0.88).text("Vertical")).changed();
-                changed |= ui.add(egui::Slider::new(&mut self.hud_layout[selected][2], 0.5..=1.8).text("Scale")).changed();
-                if changed { self.save_hud_layout(selected); }
+                let horizontal = ui.add(egui::Slider::new(&mut self.hud_layout[selected][0], 0.03..=0.97).text("Horizontal"));
+                let vertical = ui.add(egui::Slider::new(&mut self.hud_layout[selected][1], 0.12..=0.88).text("Vertical"));
+                let size = ui.add(egui::Slider::new(&mut self.hud_layout[selected][2], 0.5..=1.8).text("Scale"));
+                let commit = horizontal.drag_stopped() || vertical.drag_stopped() || size.drag_stopped()
+                    || (horizontal.changed() && !horizontal.dragged())
+                    || (vertical.changed() && !vertical.dragged())
+                    || (size.changed() && !size.dragged());
+                if commit { self.save_hud_layout(selected); }
                 ui.label(RichText::new("Position is normalized to the screen. Changes are written to Basic HUD's existing widget records.").small().color(MUTED));
             });
         self.status_line(ui);
@@ -783,41 +786,6 @@ impl NebulaClient {
                         window_control(ui, ctx, WindowAction::Maximize);
                         window_control(ui, ctx, WindowAction::Minimize);
                     });
-                });
-            });
-    }
-
-    fn sidebar(&mut self, ctx: &Context) {
-        egui::SidePanel::left("sidebar")
-            .exact_width(104.0)
-            .frame(
-                Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(17, 15, 34, 230))
-                    .inner_margin(Margin::symmetric(11, 14))
-                    .stroke(Stroke::new(1.0_f32, HAIRLINE)),
-            )
-            .show(ctx, |ui| {
-                ui.add_space(5.0);
-                let add = Button::new(RichText::new("+").size(25.0).color(PURPLE_BRIGHT))
-                    .fill(Color32::from_rgba_unmultiplied(30, 37, 51, 230))
-                    .stroke(Stroke::new(1.0_f32, HAIRLINE));
-                ui.add_sized([60.0, 52.0], add);
-                ui.add_space(13.0);
-                Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(30, 37, 51, 190))
-                    .stroke(Stroke::new(1.0_f32, PURPLE))
-                    .inner_margin(Margin::symmetric(6, 9))
-                    .show(ui, |ui| {
-                        ui.vertical_centered(|ui| {
-                            horizon_logo(ui, &self.logo, 42.0);
-                            ui.add_space(4.0);
-                            ui.label(RichText::new("Nebula").small().strong().color(TEXT));
-                        });
-                    });
-                ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
-                    ui.separator();
-                    ui.label(RichText::new("26.3").small().color(MUTED));
-                    ui.label(RichText::new("RUST").small().strong().color(PURPLE_BRIGHT));
                 });
             });
     }
