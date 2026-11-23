@@ -784,7 +784,7 @@ impl NebulaClient {
                     horizon_logo(ui, &self.logo, 27.0);
                     ui.add_space(8.0);
                     ui.label(RichText::new("NEBULA").size(13.0).strong().color(Color32::WHITE));
-                    ui.label(RichText::new("CLIENT").size(10.0).strong().color(Color32::from_rgb(222, 204, 255)));
+                    ui.label(RichText::new("CLIENT").size(10.0).strong().color(Color32::from_rgb(189, 211, 245)));
                     let drag_width = (ui.available_width() - 150.0).max(24.0);
                     let (drag_rect, drag) = ui.allocate_exact_size(Vec2::new(drag_width, 34.0), egui::Sense::click_and_drag());
                     if drag.drag_started() { ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag); }
@@ -1166,7 +1166,7 @@ impl NebulaClient {
         let hovering = ctx.input(|input| !input.raw.hovered_files.is_empty());
         Frame::NONE
             .fill(if hovering {
-                Color32::from_rgba_unmultiplied(137, 91, 231, 70)
+                Color32::from_rgba_unmultiplied(64, 118, 210, 72)
             } else {
                 Color32::from_rgb(24, 28, 39)
             })
@@ -1465,14 +1465,14 @@ fn configure_egui(ctx: &Context) {
     let mut style = (*ctx.style()).clone();
     style.visuals = egui::Visuals::dark();
     style.visuals.panel_fill = BACKGROUND;
-    style.visuals.window_fill = Color32::from_rgb(31, 20, 49);
+    style.visuals.window_fill = Color32::from_rgb(27, 33, 45);
     style.visuals.extreme_bg_color = SIDEBAR;
     style.visuals.widgets.noninteractive.fg_stroke.color = TEXT;
     style.visuals.widgets.inactive.fg_stroke.color = TEXT;
     style.visuals.widgets.hovered.fg_stroke.color = TEXT;
     style.visuals.widgets.active.fg_stroke.color = TEXT;
     style.visuals.widgets.inactive.bg_fill = Color32::from_rgba_unmultiplied(67, 100, 157, 55);
-    style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(204, 174, 255, 64));
+    style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(110, 145, 205, 64));
     style.visuals.widgets.hovered.bg_fill = Color32::from_rgba_unmultiplied(66, 125, 218, 115);
     style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(141, 187, 255, 120));
     style.visuals.widgets.active.bg_fill = PURPLE;
