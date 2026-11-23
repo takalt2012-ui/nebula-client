@@ -1,0 +1,9 @@
+id = "nebula_hud"
+name = "Nebula HUD"
+version = "0.1.0"
+description = "FPS, clicks per second and coordinates in one clean panel, in the corner you pick."
+authors = ["Nebula Client"]
+license = "MIT"
+api = "0.2"
+side = "client"
+capabilities = ["registries"]

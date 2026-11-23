@@ -1,0 +1,10 @@
+{
+  "nebula_hud.setting.corner": "Corner",
+  "nebula_hud.corner.top_left": "Top left",
+  "nebula_hud.corner.top_right": "Top right",
+  "nebula_hud.corner.bottom_left": "Bottom left",
+  "nebula_hud.corner.bottom_right": "Bottom right",
+  "nebula_hud.setting.fps": "Show FPS",
+  "nebula_hud.setting.cps": "Show clicks per second",
+  "nebula_hud.setting.coords": "Show position and direction"
+}
