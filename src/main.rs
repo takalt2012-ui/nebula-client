@@ -3,6 +3,7 @@
 //! instance configuration and account-session handoff remain correct.
 
 mod scene;
+mod setup;
 mod theme;
 mod widgets;
 
@@ -18,6 +19,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Instant, SystemTime};
 
+use setup::{SetupPoll, SetupRun, SetupStep};
 use theme::*;
 use widgets::*;
 
@@ -164,6 +166,7 @@ struct NebulaClient {
     selected_account: Option<usize>,
     status: Option<Status>,
     pending_game: Option<PendingGame>,
+    setup: Option<SetupRun>,
     hud_config_path: Option<PathBuf>,
     hud_features: [bool; 14],
     shader_packs: Vec<ShaderPackEntry>,
@@ -194,6 +197,7 @@ impl NebulaClient {
             selected_account: None,
             status: None,
             pending_game: None,
+            setup: None,
             hud_config_path: None,
             hud_features: [false; 14],
             shader_packs: Vec::new(),
@@ -672,6 +676,10 @@ impl NebulaClient {
         ui.add_space(16.0);
         ui.separator();
         ui.add_space(8.0);
+
+        if self.versions.is_empty() || self.setup.is_some() {
+            self.setup_card(ui);
+        }
 
         let performance_changed = glass_card(ui, inner_card(false), |ui| {
             ui.horizontal(|ui| {
@@ -1347,6 +1355,88 @@ impl NebulaClient {
         }
     }
 
+    fn start_setup(&mut self, step: SetupStep) {
+        let Some(launcher) = self.official_launcher.as_deref() else {
+            self.status = Some(Status {
+                message: "Horizon's launcher was not found. Install it from playhorizon.dev, then press Refresh.".into(),
+                error: true,
+            });
+            return;
+        };
+        match SetupRun::start(launcher, step) {
+            Ok(run) => {
+                self.status = None;
+                self.setup = Some(run);
+            }
+            Err(error) => {
+                self.status = Some(Status { message: error.to_string(), error: true });
+            }
+        }
+    }
+
+    fn poll_setup(&mut self, ctx: &Context) {
+        let Some(run) = self.setup.as_mut() else {
+            return;
+        };
+        match run.poll() {
+            SetupPoll::Running => ctx.request_repaint_after(std::time::Duration::from_millis(200)),
+            SetupPoll::Finished(result) => {
+                self.setup = None;
+                self.refresh();
+                self.status = Some(match result {
+                    Ok(step) => Status { message: step.done_message().into(), error: false },
+                    Err(error) => Status { message: error.to_string(), error: true },
+                });
+            }
+        }
+    }
+
+    fn setup_card(&mut self, ui: &mut egui::Ui) {
+        let mut action = None;
+        let mut cancel = false;
+        glass_card(ui, inner_card(true), |ui| {
+            if let Some(run) = &self.setup {
+                ui.label(RichText::new(run.step().title()).family(medium()).color(TEXT));
+                ui.add_space(6.0);
+                let time = ui.input(|input| input.time) as f32;
+                launch_progress(ui, time);
+                ui.add_space(8.0);
+                run.with_tail(4, |lines| {
+                    for line in lines {
+                        ui.label(RichText::new(line).size(12.0).monospace().color(MUTED));
+                    }
+                });
+                ui.add_space(8.0);
+                cancel = premium_button(ui, ButtonKind::Ghost, Some(Icon::Power), "Cancel", 0.0).clicked();
+                return;
+            }
+            ui.label(RichText::new("Set up Horizon").family(medium()).color(TEXT));
+            ui.label(
+                RichText::new("Nebula installs the game and prepares its files from your own Minecraft copy.")
+                    .size(12.5)
+                    .color(MUTED),
+            );
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                if premium_button(ui, ButtonKind::Primary, Some(Icon::Bolt), "Install Horizon", 0.0).clicked() {
+                    action = Some(SetupStep::Install);
+                }
+                if premium_button(ui, ButtonKind::Glass, Some(Icon::Refresh), "Prepare game files", 0.0).clicked() {
+                    action = Some(SetupStep::Prepare);
+                }
+            });
+        });
+        if cancel {
+            if let Some(run) = self.setup.as_mut() {
+                run.cancel();
+            }
+        }
+        if let Some(step) = action {
+            self.start_setup(step);
+        }
+        ui.add_space(16.0);
+    }
+
     fn poll_game_start(&mut self, ctx: &Context) {
         let Some(pending) = self.pending_game.as_mut() else {
             return;
@@ -1400,6 +1490,7 @@ impl NebulaClient {
 impl eframe::App for NebulaClient {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         self.poll_game_start(ctx);
+        self.poll_setup(ctx);
         self.sunset.paint(ctx);
         // Ctrl/Cmd + 1..6 jumps to a page.
         const PAGE_KEYS: [egui::Key; 6] = [
