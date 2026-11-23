@@ -59,13 +59,15 @@ impl Page {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum HudStyle {
+    Current,
     Lunar,
     Glass,
     Minimal,
 }
 
 impl HudStyle {
-    const ALL: [(Self, &'static str); 3] = [
+    const ALL: [(Self, &'static str); 4] = [
+        (Self::Current, "Current settings"),
         (Self::Lunar, "Lunar"),
         (Self::Glass, "Glass"),
         (Self::Minimal, "Minimal"),
@@ -73,6 +75,7 @@ impl HudStyle {
 
     const fn colors(self) -> (&'static str, &'static str, &'static str) {
         match self {
+            Self::Current => ("FFFFFF", "000000", "47"),
             Self::Lunar => ("F4F7FF", "111722", "78"),
             Self::Glass => ("FFFFFF", "151923", "48"),
             Self::Minimal => ("FFFFFF", "000000", "0"),
@@ -275,7 +278,7 @@ impl NebulaClient {
         self.hud_config_path = None;
         self.hud_features = [false; 14];
         self.hud_layout = [[0.02, 0.02, 1.0]; 14];
-        self.hud_style = HudStyle::Lunar;
+        self.hud_style = HudStyle::Current;
         let (Some(version), Some(launcher)) = (self.selected_version(), self.official_launcher.as_deref()) else { return; };
         let Some(tag) = version.root.file_name().and_then(|name| name.to_str()) else { return; };
         let Ok(instance) = selected_instance(launcher, tag) else { return; };
@@ -368,6 +371,11 @@ impl NebulaClient {
     }
 
     fn save_hud_style(&mut self, style: HudStyle) {
+        if style == HudStyle::Current {
+            self.hud_style = style;
+            self.status = Some(Status { message: "Keeping the HUD's current colours and opacity.".into(), error: false });
+            return;
+        }
         let Some(path) = self.hud_config_path.as_ref() else {
             self.status = Some(Status { message: "Install Basic HUD in this Horizon instance to style its widgets.".into(), error: true });
             return;
