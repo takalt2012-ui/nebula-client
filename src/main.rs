@@ -16,15 +16,15 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Instant, SystemTime};
 
-const SIDEBAR: Color32 = Color32::from_rgb(17, 15, 34);
-const BACKGROUND: Color32 = Color32::from_rgb(9, 7, 25);
-const HAIRLINE: Color32 = Color32::from_rgb(69, 58, 101);
-const TEXT: Color32 = Color32::from_rgb(246, 242, 255);
-const MUTED: Color32 = Color32::from_rgb(173, 166, 194);
-const PURPLE: Color32 = Color32::from_rgb(123, 78, 245);
-const PURPLE_BRIGHT: Color32 = Color32::from_rgb(187, 147, 255);
-const SUCCESS: Color32 = Color32::from_rgb(146, 226, 160);
-const DANGER: Color32 = Color32::from_rgb(255, 156, 171);
+const SIDEBAR: Color32 = Color32::from_rgb(20, 23, 32);
+const BACKGROUND: Color32 = Color32::from_rgb(14, 17, 24);
+const HAIRLINE: Color32 = Color32::from_rgb(53, 61, 76);
+const TEXT: Color32 = Color32::from_rgb(241, 244, 250);
+const MUTED: Color32 = Color32::from_rgb(157, 166, 181);
+const PURPLE: Color32 = Color32::from_rgb(62, 125, 235);
+const PURPLE_BRIGHT: Color32 = Color32::from_rgb(139, 184, 255);
+const SUCCESS: Color32 = Color32::from_rgb(113, 222, 173);
+const DANGER: Color32 = Color32::from_rgb(240, 124, 139);
 const HUD_WIDGETS: [&str; 14] = ["effects", "items", "durability", "totems", "health", "cooldowns", "coordinates", "fps", "ping", "speed", "cps", "clock", "armor_mini", "pickups"];
 const HUD_FEATURE_LABELS: [(&str, &str); 14] = [
     ("Effects", "Potion and status effects"), ("Items", "Consumable timers"),
@@ -41,6 +41,7 @@ enum Page {
     Play,
     Performance,
     Shaders,
+    Customize,
     Diagnostics,
     Settings,
 }
@@ -50,9 +51,33 @@ impl Page {
         (Self::Play, "Home"),
         (Self::Performance, "Mods"),
         (Self::Shaders, "Shaders"),
+        (Self::Customize, "Customize"),
         (Self::Diagnostics, "Builds"),
         (Self::Settings, "Settings"),
     ];
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum HudStyle {
+    Lunar,
+    Glass,
+    Minimal,
+}
+
+impl HudStyle {
+    const ALL: [(Self, &'static str); 3] = [
+        (Self::Lunar, "Lunar"),
+        (Self::Glass, "Glass"),
+        (Self::Minimal, "Minimal"),
+    ];
+
+    const fn colors(self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            Self::Lunar => ("F4F7FF", "111722", "78"),
+            Self::Glass => ("FFFFFF", "151923", "48"),
+            Self::Minimal => ("FFFFFF", "000000", "0"),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -168,6 +193,9 @@ struct NebulaClient {
     pending_game: Option<PendingGame>,
     hud_config_path: Option<PathBuf>,
     hud_features: [bool; 14],
+    hud_layout: [[f32; 3]; 14],
+    hud_selected: usize,
+    hud_style: HudStyle,
     shader_packs: Vec<ShaderPackEntry>,
     shader_picked: String,
     shader_dir: Option<PathBuf>,
@@ -194,6 +222,9 @@ impl NebulaClient {
             pending_game: None,
             hud_config_path: None,
             hud_features: [false; 14],
+            hud_layout: [[0.02, 0.02, 1.0]; 14],
+            hud_selected: 0,
+            hud_style: HudStyle::Lunar,
             shader_packs: Vec::new(),
             shader_picked: String::new(),
             shader_dir: None,
@@ -243,6 +274,8 @@ impl NebulaClient {
     fn load_hud_features(&mut self) {
         self.hud_config_path = None;
         self.hud_features = [false; 14];
+        self.hud_layout = [[0.02, 0.02, 1.0]; 14];
+        self.hud_style = HudStyle::Lunar;
         let (Some(version), Some(launcher)) = (self.selected_version(), self.official_launcher.as_deref()) else { return; };
         let Some(tag) = version.root.file_name().and_then(|name| name.to_str()) else { return; };
         let Ok(instance) = selected_instance(launcher, tag) else { return; };
@@ -255,7 +288,13 @@ impl NebulaClient {
             for (i, key) in HUD_WIDGETS.iter().enumerate() {
                 let name = format!("w.{key}");
                 if let Some(value) = config.split(';').find_map(|pair| pair.split_once('=').filter(|(k, _)| *k == name).map(|(_, v)| v)) {
-                    self.hud_features[i] = value.split(',').next().is_some_and(|enabled| enabled == "1");
+                    let fields = value.split(',').collect::<Vec<_>>();
+                    self.hud_features[i] = fields.first().is_some_and(|enabled| *enabled == "1");
+                    for (slot, field) in fields.iter().skip(1).take(3).enumerate() {
+                        if let Ok(parsed) = field.parse::<f32>() {
+                            self.hud_layout[i][slot] = parsed.clamp(if slot == 2 { 0.25 } else { 0.0 }, if slot == 2 { 3.0 } else { 1.0 });
+                        }
+                    }
                 }
             }
         }
@@ -290,6 +329,169 @@ impl NebulaClient {
             Ok(()) => { self.hud_features[index] = enabled; self.status = Some(Status { message: "Basic HUD setting saved. It will be active next time Horizon starts.".into(), error: false }); }
             Err(error) => self.status = Some(Status { message: format!("Could not save Basic HUD setting: {error}"), error: true }),
         }
+    }
+
+    fn save_hud_layout(&mut self, index: usize) {
+        let Some(path) = self.hud_config_path.as_ref() else {
+            self.status = Some(Status { message: "Install Basic HUD in this Horizon instance to edit its layout.".into(), error: true });
+            return;
+        };
+        let source = match fs::read_to_string(path) {
+            Ok(source) => source,
+            Err(error) => {
+                self.status = Some(Status { message: format!("Could not read HUD config: {error}"), error: true });
+                return;
+            }
+        };
+        let key = format!("w.{}", HUD_WIDGETS[index]);
+        let [x, y, scale] = self.hud_layout[index];
+        let mut found = false;
+        let pairs = source.split(';').map(|pair| {
+            let Some((name, value)) = pair.split_once('=') else { return pair.to_owned(); };
+            if name != key { return pair.to_owned(); }
+            found = true;
+            let mut fields = value.split(',').map(str::to_owned).collect::<Vec<_>>();
+            while fields.len() < 4 { fields.push("1".to_owned()); }
+            fields[1] = format!("{x:.3}");
+            fields[2] = format!("{y:.3}");
+            fields[3] = format!("{scale:.2}");
+            format!("{name}={}", fields.join(","))
+        }).collect::<Vec<_>>();
+        if !found {
+            self.status = Some(Status { message: format!("HUD widget record {key} is missing; toggle it once to create it."), error: true });
+            return;
+        }
+        match fs::write(path, pairs.join(";")) {
+            Ok(()) => self.status = Some(Status { message: "HUD layout saved. Horizon reads it on the next game launch.".into(), error: false }),
+            Err(error) => self.status = Some(Status { message: format!("Could not save HUD layout: {error}"), error: true }),
+        }
+    }
+
+    fn save_hud_style(&mut self, style: HudStyle) {
+        let Some(path) = self.hud_config_path.as_ref() else {
+            self.status = Some(Status { message: "Install Basic HUD in this Horizon instance to style its widgets.".into(), error: true });
+            return;
+        };
+        let source = match fs::read_to_string(path) {
+            Ok(source) => source,
+            Err(error) => {
+                self.status = Some(Status { message: format!("Could not read HUD config: {error}"), error: true });
+                return;
+            }
+        };
+        let (foreground, background, opacity) = style.colors();
+        let pairs = source.split(';').map(|pair| {
+            let Some((name, value)) = pair.split_once('=') else { return pair.to_owned(); };
+            if !name.starts_with("w.") { return pair.to_owned(); }
+            let mut fields = value.split(',').map(str::to_owned).collect::<Vec<_>>();
+            if fields.len() < 8 { return pair.to_owned(); }
+            fields[5] = foreground.to_owned();
+            fields[6] = background.to_owned();
+            fields[7] = opacity.to_owned();
+            format!("{name}={}", fields.join(","))
+        }).collect::<Vec<_>>();
+        match fs::write(path, pairs.join(";")) {
+            Ok(()) => {
+                self.hud_style = style;
+                self.status = Some(Status { message: "HUD appearance saved. The preset applies next time Horizon starts.".into(), error: false });
+            }
+            Err(error) => self.status = Some(Status { message: format!("Could not save HUD appearance: {error}"), error: true }),
+        }
+    }
+
+    fn customize_page(&mut self, ui: &mut egui::Ui) {
+        ui.label(RichText::new("CLIENT CUSTOMIZATION").small().strong().color(PURPLE_BRIGHT));
+        ui.add_space(4.0);
+        ui.label(RichText::new("HUD Studio").font(FontId::new(34.0, FontFamily::Proportional)).strong().color(TEXT));
+        ui.label(RichText::new("A clean, Lunar-inspired HUD. Tune its layout and appearance without editing config files.").color(MUTED));
+        ui.add_space(18.0);
+
+        if self.hud_config_path.is_none() {
+            Frame::NONE.fill(Color32::from_rgb(24, 28, 39))
+                .stroke(Stroke::new(1.0, HAIRLINE)).inner_margin(Margin::same(18)).show(ui, |ui| {
+                    ui.label(RichText::new("Basic HUD is not installed for this instance").strong().color(TEXT));
+                    ui.label(RichText::new("Install the Basic HUD native mod in Horizon, select that instance on Home, then refresh. The editor writes to the mod's existing config.").color(MUTED));
+                });
+            self.status_line(ui);
+            return;
+        }
+
+        Frame::NONE.fill(Color32::from_rgb(24, 28, 39))
+            .stroke(Stroke::new(1.0, HAIRLINE)).inner_margin(Margin::same(16)).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("HUD APPEARANCE").small().strong().color(PURPLE_BRIGHT));
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let mut selected = self.hud_style;
+                        ComboBox::from_id_salt("nebula_hud_style")
+                            .selected_text(HudStyle::ALL.iter().find(|(style, _)| *style == selected).map(|(_, name)| *name).unwrap_or("Lunar"))
+                            .width(180.0)
+                            .show_ui(ui, |ui| {
+                                for (style, name) in HudStyle::ALL {
+                                    ui.selectable_value(&mut selected, style, name);
+                                }
+                            });
+                        if selected != self.hud_style { self.save_hud_style(selected); }
+                    });
+                });
+                ui.label(RichText::new("Lunar: crisp white text · cool charcoal panels").small().color(MUTED));
+            });
+        ui.add_space(12.0);
+
+        let selected = self.hud_selected.min(HUD_WIDGETS.len().saturating_sub(1));
+        Frame::NONE.fill(Color32::from_rgb(24, 28, 39))
+            .stroke(Stroke::new(1.0, HAIRLINE)).inner_margin(Margin::same(16)).show(ui, |ui| {
+                ui.label(RichText::new("WIDGETS").small().strong().color(PURPLE_BRIGHT));
+                ui.add_space(8.0);
+                egui::Grid::new("nebula_hud_studio_widgets").num_columns(2).spacing([20.0, 8.0]).show(ui, |ui| {
+                    for (index, (name, hint)) in HUD_FEATURE_LABELS.iter().enumerate() {
+                        let response = ui.add(egui::SelectableLabel::new(self.hud_selected == index, *name));
+                        ui.label(RichText::new(if self.hud_features[index] { "ON" } else { "OFF" }).small().color(if self.hud_features[index] { SUCCESS } else { MUTED }));
+                        ui.end_row();
+                        if response.clicked() { self.hud_selected = index; }
+                        let _ = hint;
+                    }
+                });
+                ui.add_space(6.0);
+                let mut enabled = self.hud_features[selected];
+                if ui.checkbox(&mut enabled, format!("Show {}", HUD_FEATURE_LABELS[selected].0)).changed() {
+                    self.save_hud_feature(selected, enabled);
+                }
+            });
+        ui.add_space(12.0);
+
+        Frame::NONE.fill(Color32::from_rgb(24, 28, 39))
+            .stroke(Stroke::new(1.0, HAIRLINE)).inner_margin(Margin::same(16)).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new(HUD_FEATURE_LABELS[selected].0).strong().color(TEXT));
+                        ui.label(RichText::new(HUD_FEATURE_LABELS[selected].1).small().color(MUTED));
+                    });
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        ui.label(RichText::new("PREVIEW").small().strong().color(PURPLE_BRIGHT));
+                    });
+                });
+                ui.add_space(10.0);
+                let (preview, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 150.0), egui::Sense::hover());
+                let painter = ui.painter_at(preview);
+                painter.rect_filled(preview, 8.0, Color32::from_rgb(17, 22, 31));
+                painter.rect_stroke(preview, 8.0, Stroke::new(1.0, Color32::from_rgb(57, 67, 84)), egui::StrokeKind::Inside);
+                painter.text(preview.left_top() + Vec2::new(12.0, 10.0), egui::Align2::LEFT_TOP, "NEBULA HUD", FontId::proportional(10.0), MUTED);
+                let [x, y, scale] = self.hud_layout[selected];
+                let factor = scale.clamp(0.5, 1.8);
+                let point = egui::pos2(preview.left() + preview.width() * x.clamp(0.03, 0.97), preview.top() + preview.height() * y.clamp(0.12, 0.88));
+                let sample = egui::Rect::from_center_size(point, Vec2::new(128.0 * factor, 25.0 * factor));
+                painter.rect_filled(sample, 5.0, Color32::from_rgba_unmultiplied(12, 17, 25, 225));
+                painter.rect_stroke(sample, 5.0, Stroke::new(1.0, Color32::from_rgb(77, 145, 255)), egui::StrokeKind::Inside);
+                painter.text(sample.center(), egui::Align2::CENTER_CENTER, HUD_FEATURE_LABELS[selected].0, FontId::proportional(12.0 * factor), TEXT);
+                ui.add_space(10.0);
+                let mut changed = false;
+                changed |= ui.add(egui::Slider::new(&mut self.hud_layout[selected][0], 0.03..=0.97).text("Horizontal")).changed();
+                changed |= ui.add(egui::Slider::new(&mut self.hud_layout[selected][1], 0.12..=0.88).text("Vertical")).changed();
+                changed |= ui.add(egui::Slider::new(&mut self.hud_layout[selected][2], 0.5..=1.8).text("Scale")).changed();
+                if changed { self.save_hud_layout(selected); }
+                ui.label(RichText::new("Position is normalized to the screen. Changes are written to Basic HUD's existing widget records.").small().color(MUTED));
+            });
+        self.status_line(ui);
     }
 
     /// Resolves the selected instance's `shaderpacks/` and `horizon-graphics.txt`, then
@@ -524,9 +726,9 @@ impl NebulaClient {
             .exact_height(60.0)
             .frame(
                 Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(27, 18, 52, 238))
+                    .fill(Color32::from_rgba_unmultiplied(20, 23, 33, 238))
                     .inner_margin(Margin::symmetric(22, 8))
-                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(172, 133, 255, 45))),
+                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(115, 145, 210, 42))),
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
@@ -536,8 +738,8 @@ impl NebulaClient {
                         for (page, label) in Page::ALL {
                             let selected = self.page == page;
                             let button = Button::new(RichText::new(label).size(14.0).strong().color(if selected { TEXT } else { MUTED }))
-                                .fill(if selected { Color32::from_rgba_unmultiplied(139, 91, 249, 185) } else { Color32::TRANSPARENT })
-                                .stroke(Stroke::new(1.0_f32, if selected { Color32::from_rgba_unmultiplied(203, 174, 255, 125) } else { Color32::TRANSPARENT }))
+                                .fill(if selected { Color32::from_rgba_unmultiplied(57, 112, 218, 190) } else { Color32::TRANSPARENT })
+                                .stroke(Stroke::new(1.0_f32, if selected { Color32::from_rgba_unmultiplied(132, 177, 255, 125) } else { Color32::TRANSPARENT }))
                                 .min_size(Vec2::new(77.0, 39.0));
                             if ui.add(button).clicked() { self.page = page; }
                         }
@@ -548,8 +750,8 @@ impl NebulaClient {
                             .map(|account| account.name.as_str())
                             .unwrap_or("Account not loaded");
                         Frame::NONE
-                            .fill(Color32::from_rgba_unmultiplied(104, 70, 177, 90))
-                            .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(193, 158, 255, 100)))
+                            .fill(Color32::from_rgba_unmultiplied(55, 94, 155, 70))
+                            .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(122, 164, 230, 85)))
                             .inner_margin(Margin::symmetric(14, 7))
                             .show(ui, |ui| {
                                 ui.vertical(|ui| {
@@ -565,7 +767,7 @@ impl NebulaClient {
     fn windowbar(&mut self, ctx: &Context) {
         egui::TopBottomPanel::top("windowbar")
             .exact_height(42.0)
-            .frame(Frame::NONE.fill(Color32::from_rgb(87, 48, 154)).inner_margin(Margin::symmetric(14, 4)))
+            .frame(Frame::NONE.fill(Color32::from_rgb(17, 20, 29)).inner_margin(Margin::symmetric(14, 4)))
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     horizon_logo(ui, &self.logo, 27.0);
@@ -597,12 +799,12 @@ impl NebulaClient {
             .show(ctx, |ui| {
                 ui.add_space(5.0);
                 let add = Button::new(RichText::new("+").size(25.0).color(PURPLE_BRIGHT))
-                    .fill(Color32::from_rgba_unmultiplied(44, 35, 74, 220))
+                    .fill(Color32::from_rgba_unmultiplied(30, 37, 51, 230))
                     .stroke(Stroke::new(1.0_f32, HAIRLINE));
                 ui.add_sized([60.0, 52.0], add);
                 ui.add_space(13.0);
                 Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(68, 50, 111, 190))
+                    .fill(Color32::from_rgba_unmultiplied(30, 37, 51, 190))
                     .stroke(Stroke::new(1.0_f32, PURPLE))
                     .inner_margin(Margin::symmetric(6, 9))
                     .show(ui, |ui| {
@@ -621,7 +823,7 @@ impl NebulaClient {
     }
 
     fn play_page(&mut self, ui: &mut egui::Ui, ctx: &Context) {
-        Frame::NONE.fill(Color32::from_rgba_unmultiplied(17, 13, 34, 205))
+        Frame::NONE.fill(Color32::from_rgba_unmultiplied(21, 25, 35, 232))
             .stroke(Stroke::new(1.0_f32, HAIRLINE)).inner_margin(Margin::symmetric(25, 22)).show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
@@ -643,7 +845,7 @@ impl NebulaClient {
             ui.separator();
             ui.add_space(8.0);
             let performance_changed = Frame::NONE
-            .fill(Color32::from_rgba_unmultiplied(30, 24, 49, 180))
+            .fill(Color32::from_rgb(24, 28, 39))
             .stroke(Stroke::new(1.0_f32, HAIRLINE))
             .inner_margin(Margin::symmetric(16, 11))
             .show(ui, |ui| {
@@ -808,24 +1010,15 @@ impl NebulaClient {
         ui.add_space(8.0);
         ui.label(
             RichText::new("Performance Mode")
-                .font(FontId::new(42.0, FontFamily::Proportional))
+                .font(FontId::new(34.0, FontFamily::Proportional))
                 .color(TEXT),
         );
         ui.label(RichText::new("Only supported, game-scoped settings are applied. No system-wide tuning is changed.").color(MUTED));
         ui.add_space(12.0);
-        Frame::NONE.fill(Color32::from_rgba_unmultiplied(30, 24, 49, 225)).stroke(Stroke::new(1.0_f32, HAIRLINE)).inner_margin(Margin::symmetric(16, 13)).show(ui, |ui| {
-            ui.label(RichText::new("IN-GAME HUD  ·  BASIC HUD").small().strong().color(PURPLE_BRIGHT));
-            ui.label(RichText::new(if self.hud_config_path.is_some() { "These switches update the installed native mod." } else { "Basic HUD settings are not available for the selected instance." }).small().color(MUTED));
-            ui.add_space(8.0);
-            egui::Grid::new("nebula_hud_features").num_columns(2).spacing([18.0, 5.0]).show(ui, |ui| {
-                for (index, (name, hint)) in HUD_FEATURE_LABELS.iter().enumerate() {
-                    let mut active = self.hud_features[index];
-                    let response = ui.add_enabled(self.hud_config_path.is_some(), egui::Checkbox::new(&mut active, *name));
-                    ui.label(RichText::new(*hint).small().color(MUTED));
-                    ui.end_row();
-                    if response.changed() { self.save_hud_feature(index, active); }
-                }
-            });
+        Frame::NONE.fill(Color32::from_rgb(24, 28, 39)).stroke(Stroke::new(1.0, HAIRLINE)).inner_margin(Margin::same(16)).show(ui, |ui| {
+            ui.label(RichText::new("HUD customization").strong().color(TEXT));
+            ui.label(RichText::new("Widget visibility, layout and visual presets now live in HUD Studio.").small().color(MUTED));
+            if ui.button("Open HUD Studio  →").clicked() { self.page = Page::Customize; }
         });
         ui.add_space(24.0);
 
@@ -925,7 +1118,7 @@ impl NebulaClient {
         ui.add_space(8.0);
         ui.label(
             RichText::new("Shader Packs")
-                .font(FontId::new(42.0, FontFamily::Proportional))
+                .font(FontId::new(34.0, FontFamily::Proportional))
                 .color(TEXT),
         );
         ui.label(
@@ -953,7 +1146,7 @@ impl NebulaClient {
 
         // Current pick / off state.
         Frame::NONE
-            .fill(Color32::from_rgba_unmultiplied(30, 24, 49, 225))
+            .fill(Color32::from_rgb(24, 28, 39))
             .stroke(Stroke::new(1.0_f32, HAIRLINE))
             .inner_margin(Margin::symmetric(16, 13))
             .show(ui, |ui| {
@@ -978,10 +1171,10 @@ impl NebulaClient {
                                 .add_enabled(
                                     !running,
                                     Button::new(RichText::new("Disable").size(14.0).color(TEXT))
-                                        .fill(Color32::from_rgba_unmultiplied(137, 91, 231, 100))
+                                        .fill(Color32::from_rgba_unmultiplied(56, 105, 192, 120))
                                         .stroke(Stroke::new(
                                             1.0_f32,
-                                            Color32::from_rgba_unmultiplied(204, 174, 255, 105),
+                                            Color32::from_rgba_unmultiplied(116, 160, 231, 100),
                                         ))
                                         .min_size(Vec2::new(110.0, 38.0)),
                                 )
@@ -999,7 +1192,7 @@ impl NebulaClient {
             .fill(if hovering {
                 Color32::from_rgba_unmultiplied(137, 91, 231, 70)
             } else {
-                Color32::from_rgba_unmultiplied(30, 24, 49, 180)
+                Color32::from_rgb(24, 28, 39)
             })
             .stroke(Stroke::new(
                 1.0_f32,
@@ -1036,7 +1229,7 @@ impl NebulaClient {
         for pack in &packs {
             let active = !picked.is_empty() && (picked == pack.key || picked == pack.file);
             Frame::NONE
-                .fill(Color32::from_rgba_unmultiplied(30, 24, 49, 180))
+                .fill(Color32::from_rgb(24, 28, 39))
                 .stroke(Stroke::new(
                     1.0_f32,
                     if active { PURPLE } else { HAIRLINE },
@@ -1063,10 +1256,10 @@ impl NebulaClient {
                                 .add_enabled(
                                     !running,
                                     Button::new(RichText::new("Enable").size(14.0).color(TEXT))
-                                        .fill(Color32::from_rgba_unmultiplied(137, 91, 231, 100))
+                                        .fill(Color32::from_rgba_unmultiplied(56, 105, 192, 120))
                                         .stroke(Stroke::new(
                                             1.0_f32,
-                                            Color32::from_rgba_unmultiplied(204, 174, 255, 105),
+                                            Color32::from_rgba_unmultiplied(116, 160, 231, 100),
                                         ))
                                         .min_size(Vec2::new(110.0, 34.0)),
                                 )
@@ -1108,7 +1301,7 @@ impl NebulaClient {
         ui.add_space(8.0);
         ui.label(
             RichText::new("Local installation")
-                .font(FontId::new(42.0, FontFamily::Proportional))
+                .font(FontId::new(34.0, FontFamily::Proportional))
                 .color(TEXT),
         );
         ui.add_space(18.0);
@@ -1149,7 +1342,7 @@ impl NebulaClient {
         ui.add_space(8.0);
         ui.label(
             RichText::new("Nebula Client")
-                .font(FontId::new(42.0, FontFamily::Proportional))
+                .font(FontId::new(34.0, FontFamily::Proportional))
                 .color(TEXT),
         );
         ui.label(
@@ -1236,19 +1429,18 @@ impl eframe::App for NebulaClient {
         self.sunset.paint(ctx);
         self.windowbar(ctx);
         self.topbar(ctx);
-        self.sidebar(ctx);
-
-        egui::CentralPanel::default()
+remove stale sidebar        egui::CentralPanel::default()
             .frame(
                 Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(11, 8, 26, 155))
-                    .inner_margin(Margin::symmetric(42, 34)),
+                    .fill(Color32::from_rgba_unmultiplied(14, 17, 24, 175))
+                    .inner_margin(Margin::symmetric(30, 24)),
             )
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| match self.page {
                     Page::Play => self.play_page(ui, ctx),
                     Page::Performance => self.performance_page(ui),
                     Page::Shaders => self.shaders_page(ui, ctx),
+                    Page::Customize => self.customize_page(ui),
                     Page::Diagnostics => self.diagnostics_page(ui),
                     Page::Settings => self.settings_page(ui),
                 });
@@ -1303,13 +1495,13 @@ fn configure_egui(ctx: &Context) {
     style.visuals.widgets.inactive.fg_stroke.color = TEXT;
     style.visuals.widgets.hovered.fg_stroke.color = TEXT;
     style.visuals.widgets.active.fg_stroke.color = TEXT;
-    style.visuals.widgets.inactive.bg_fill = Color32::from_rgba_unmultiplied(115, 69, 176, 65);
+    style.visuals.widgets.inactive.bg_fill = Color32::from_rgba_unmultiplied(67, 100, 157, 55);
     style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(204, 174, 255, 64));
-    style.visuals.widgets.hovered.bg_fill = Color32::from_rgba_unmultiplied(146, 96, 224, 110);
-    style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(225, 205, 255, 120));
+    style.visuals.widgets.hovered.bg_fill = Color32::from_rgba_unmultiplied(66, 125, 218, 115);
+    style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(141, 187, 255, 120));
     style.visuals.widgets.active.bg_fill = PURPLE;
-    style.visuals.widgets.open.bg_fill = Color32::from_rgb(46, 29, 72);
-    style.visuals.widgets.open.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(205, 173, 255, 90));
+    style.visuals.widgets.open.bg_fill = Color32::from_rgb(29, 38, 54);
+    style.visuals.widgets.open.bg_stroke = Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(118, 160, 224, 90));
     style.visuals.popup_shadow = egui::epaint::Shadow { offset: [0, 10], blur: 28, spread: 0, color: Color32::from_black_alpha(130) };
     style.spacing.combo_width = 330.0;
     style.visuals.selection.bg_fill = PURPLE;
@@ -1351,8 +1543,8 @@ fn quiet_action(ui: &mut egui::Ui, glyph: &str, label: &str) -> egui::Response {
                 .size(14.0)
                 .color(TEXT),
         )
-        .fill(Color32::from_rgba_unmultiplied(137, 91, 231, 100))
-        .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(204, 174, 255, 105)))
+        .fill(Color32::from_rgba_unmultiplied(56, 105, 192, 120))
+        .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(116, 160, 231, 100)))
         .min_size(Vec2::new(145.0, 38.0)),
     )
 }
@@ -1364,7 +1556,7 @@ fn window_control(ui: &mut egui::Ui, ctx: &Context, action: WindowAction) {
     let (rect, response) = ui.allocate_exact_size(Vec2::new(40.0, 32.0), egui::Sense::click());
     let fill = match (action, response.hovered()) {
         (WindowAction::Close, true) => Color32::from_rgb(212, 70, 103),
-        (_, true) => Color32::from_rgba_unmultiplied(255, 255, 255, 38),
+        (_, true) => Color32::from_rgba_unmultiplied(255, 255, 255, 28),
         _ => Color32::TRANSPARENT,
     };
     ui.painter().rect_filled(rect, 7.0, fill);
@@ -1402,7 +1594,7 @@ fn toggle_switch(ui: &mut egui::Ui, value: &mut bool) -> egui::Response {
     let color = if *value {
         PURPLE
     } else {
-        Color32::from_rgb(54, 49, 68)
+        Color32::from_rgb(51, 58, 71)
     };
     ui.painter().rect_filled(rect, 13.0, color);
     ui.painter().circle_filled(
