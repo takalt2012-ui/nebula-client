@@ -8,7 +8,7 @@ use crate::{
 use horizon_hooks::hud;
 
 /// The gap between an overlay and the screen edge or the next overlay.
-const MARGIN: f32 = 3.0;
+const MARGIN: f32 = 2.0;
 const BACKGROUND: u32 = 0x7800_0000;
 
 /// Where the next overlay goes in each corner.
