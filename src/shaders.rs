@@ -97,7 +97,7 @@ mod tests {
         let second_run = ensure_builtin_shader_pack(&root);
         assert!(second_run.is_ok(), "second provisioning failed: {second_run:?}");
         let preserved = fs::read_to_string(&sky_path);
-        assert_eq!(preserved.as_deref(), Ok(custom_sky));
+        assert!(matches!(preserved, Ok(contents) if contents == custom_sky));
 
         let _ = fs::remove_dir_all(&root);
     }
