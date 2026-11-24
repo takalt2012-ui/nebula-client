@@ -587,7 +587,7 @@ impl NebulaClient {
             .exact_width(if compact { 78.0 } else { 196.0 })
             .frame(
                 Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(10, 7, 24, 100))
+                    .fill(Color32::from_rgba_unmultiplied(10, 7, 24, 205))
                     .inner_margin(Margin::symmetric(12, 18))
                     .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 22))),
             )
@@ -618,16 +618,6 @@ impl NebulaClient {
         let running = game_is_running();
         let starting = self.pending_game.is_some();
 
-        ui.label(RichText::new("NEBULA  /  HORIZON 26.3").size(12.0).family(semibold()).color(CORAL_TEXT));
-        ui.add_space(2.0);
-        ui.label(
-            RichText::new("Your world,\nat full speed.")
-                .font(FontId::new(40.0, semibold()))
-                .color(TEXT),
-        );
-        ui.add_space(2.0);
-        ui.label(RichText::new("Native Minecraft client  ·  Rust edition").color(MUTED));
-        ui.add_space(8.0);
         let (state, color) = if running {
             ("Game running", SUCCESS)
         } else if starting {
@@ -637,129 +627,101 @@ impl NebulaClient {
         };
         let build = self
             .selected_version()
-            .map(|version| version.label.clone())
-            .unwrap_or_else(|| "No build selected".to_owned());
-        status_chip(ui, state, color, &build);
-        ui.add_space(16.0);
-        ui.separator();
-        ui.add_space(8.0);
+            .map_or("No build selected", |version| version.label.as_str());
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("NEBULA  /  HORIZON 26.3").size(12.0).family(semibold()).color(CORAL_TEXT));
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| status_chip(ui, state, color, build));
+        });
+        ui.add_space(6.0);
+        ui.label(RichText::new("Your world, at full speed.").font(FontId::new(34.0, semibold())).color(TEXT));
+        ui.add_space(2.0);
+        ui.label(RichText::new("Native Minecraft client  ·  Rust edition").color(MUTED));
+        ui.add_space(20.0);
 
         if self.versions.is_empty() || self.setup.is_some() {
             self.setup_card(ui);
         }
 
-        let performance_changed = glass_card(ui, inner_card(false), |ui| {
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.spacing_mut().item_spacing.y = 3.0;
-                    ui.label(RichText::new("Performance profile").family(medium()).color(TEXT));
-                    ui.label(
-                        RichText::new("Dedicated shader cache and optional game-scoped tweaks")
-                            .size(12.5)
-                            .color(MUTED),
-                    );
-                });
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(
-                        RichText::new(if self.settings.performance_mode { "ON" } else { "OFF" })
-                            .size(12.5)
-                            .family(medium())
-                            .color(if self.settings.performance_mode { PURPLE_BRIGHT } else { MUTED }),
-                    );
-                    toggle_switch(ui, &mut self.settings.performance_mode)
-                })
-                .inner
-                .changed()
-            })
-            .inner
-        });
-        if performance_changed {
-            self.persist_selection();
-        }
-        ui.add_space(16.0);
-
-        let previous_version = self.selected_version;
-        labeled_combo(
-            ui,
-            "Build",
-            "Choose a locally prepared Horizon build",
-            "version",
-            &mut self.selected_version,
-            self.versions
-                .iter()
-                .enumerate()
-                .map(|(index, version)| (index, version.label.as_str())),
-        );
-        if previous_version != self.selected_version {
-            self.selected_resource = self
-                .selected_version()
-                .and_then(|version| (!version.resources.is_empty()).then_some(0));
-            self.persist_selection();
-        }
-
-        let resource_choices: Vec<(usize, String)> = self
-            .selected_version()
-            .into_iter()
-            .flat_map(|version| version.resources.iter().enumerate())
-            .map(|(index, resource)| (index, resource.label.clone()))
-            .collect();
-        let previous_resource = self.selected_resource;
-        labeled_combo(
-            ui,
-            "Resources",
-            "Prepared game resources used by this build",
-            "resources",
-            &mut self.selected_resource,
-            resource_choices
-                .iter()
-                .map(|(index, label)| (*index, label.as_str())),
-        );
-
-        let previous_account = self.selected_account;
-        if self.accounts.is_empty() {
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.spacing_mut().item_spacing.y = 3.0;
-                    ui.label(RichText::new("Account").family(medium()).color(TEXT));
-                    ui.label(
-                        RichText::new("A one-time sign-in session is created only when you play.")
-                            .size(12.5)
-                            .color(MUTED),
-                    );
-                });
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let can_load = self.official_launcher.is_some();
-                    if ui
-                        .add_enabled_ui(can_load, |ui| {
-                            premium_button(ui, ButtonKind::Glass, Some(Icon::User), "Load accounts", 150.0)
-                        })
-                        .inner
-                        .clicked()
-                    {
-                        self.load_accounts();
-                    }
-                });
+        glass_card(ui, inner_card(false), |ui| {
+            let mut performance_changed = false;
+            form_row(ui, "Performance profile", "Dedicated shader cache and game-scoped tweaks", |ui| {
+                performance_changed = toggle_switch(ui, &mut self.settings.performance_mode).changed();
             });
-            ui.separator();
-        } else {
+            if performance_changed {
+                self.persist_selection();
+            }
+            row_divider(ui);
+
+            let previous_version = self.selected_version;
             labeled_combo(
                 ui,
-                "Account",
-                "A fresh one-time game session is requested just before launch.",
-                "account",
-                &mut self.selected_account,
-                self.accounts
+                "Build",
+                "Choose a locally prepared Horizon build",
+                "version",
+                &mut self.selected_version,
+                self.versions
                     .iter()
                     .enumerate()
-                    .map(|(index, account)| (index, account.name.as_str())),
+                    .map(|(index, version)| (index, version.label.as_str())),
             );
-        }
-        if previous_resource != self.selected_resource || previous_account != self.selected_account
-        {
-            self.persist_selection();
-        }
+            if previous_version != self.selected_version {
+                self.selected_resource = self
+                    .selected_version()
+                    .and_then(|version| (!version.resources.is_empty()).then_some(0));
+                self.persist_selection();
+            }
+            row_divider(ui);
 
-        ui.add_space(14.0);
+            let resource_choices: Vec<(usize, String)> = self
+                .selected_version()
+                .into_iter()
+                .flat_map(|version| version.resources.iter().enumerate())
+                .map(|(index, resource)| (index, resource.label.clone()))
+                .collect();
+            let previous_resource = self.selected_resource;
+            labeled_combo(
+                ui,
+                "Resources",
+                "Prepared game resources used by this build",
+                "resources",
+                &mut self.selected_resource,
+                resource_choices
+                    .iter()
+                    .map(|(index, label)| (*index, label.as_str())),
+            );
+            row_divider(ui);
+
+            let previous_account = self.selected_account;
+            if self.accounts.is_empty() {
+                let can_load = self.official_launcher.is_some();
+                let mut load = false;
+                form_row(ui, "Account", "A one-time sign-in session is created only when you play.", |ui| {
+                    ui.add_enabled_ui(can_load, |ui| {
+                        load = premium_button(ui, ButtonKind::Glass, Some(Icon::User), "Load accounts", CONTROL_WIDTH).clicked();
+                    });
+                });
+                if load {
+                    self.load_accounts();
+                }
+            } else {
+                labeled_combo(
+                    ui,
+                    "Account",
+                    "A fresh one-time game session is requested just before launch.",
+                    "account",
+                    &mut self.selected_account,
+                    self.accounts
+                        .iter()
+                        .enumerate()
+                        .map(|(index, account)| (index, account.name.as_str())),
+                );
+            }
+            if previous_resource != self.selected_resource || previous_account != self.selected_account {
+                self.persist_selection();
+            }
+        });
+
+        ui.add_space(20.0);
         // Same four requirements the launch path checks, surfaced before the click.
         let blocker = if self.official_launcher.is_none() {
             Some("Horizon's sign-in helper was not found.")
@@ -1783,6 +1745,29 @@ fn window_control(ui: &mut egui::Ui, ctx: &Context, action: WindowAction) {
 }
 
 
+/// Width of the control column shared by every settings row, so controls line up down a page.
+const CONTROL_WIDTH: f32 = 300.0;
+
+/// A settings row: title and description on the left, the control in a column on the right.
+fn form_row(ui: &mut egui::Ui, title: &str, description: &str, add_control: impl FnOnce(&mut egui::Ui)) {
+    ui.horizontal(|ui| {
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing.y = 3.0;
+            ui.label(RichText::new(title).family(medium()).color(TEXT));
+            ui.label(RichText::new(description).size(12.5).color(MUTED));
+        });
+        ui.with_layout(Layout::right_to_left(Align::Center), add_control);
+    });
+}
+
+/// A hairline between two rows of a card.
+fn row_divider(ui: &mut egui::Ui) {
+    ui.add_space(12.0);
+    let (line, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 1.0), egui::Sense::hover());
+    ui.painter().rect_filled(line, 0.0, Color32::from_white_alpha(18));
+    ui.add_space(12.0);
+}
+
 fn labeled_combo<'a>(
     ui: &mut egui::Ui,
     title: &str,
@@ -1792,46 +1777,25 @@ fn labeled_combo<'a>(
     choices: impl IntoIterator<Item = (usize, &'a str)>,
 ) {
     let choices: Vec<(usize, &'a str)> = choices.into_iter().collect();
+    form_row(ui, title, description, |ui| {
+        let width = CONTROL_WIDTH.min(ui.available_width());
+        premium_dropdown(ui, egui::Id::new(("nebula_dropdown", id)), width, &choices, selected);
+    });
+}
+
+fn setting_row(ui: &mut egui::Ui, value: &mut bool, title: &str, description: &str, enabled: bool) -> bool {
+    let mut changed = false;
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = 3.0;
-            ui.label(RichText::new(title).family(medium()).color(TEXT));
+            ui.label(RichText::new(title).family(medium()).color(if enabled { TEXT } else { MUTED }));
             ui.label(RichText::new(description).size(12.5).color(MUTED));
         });
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            let width = 330.0_f32.min(ui.available_width());
-            premium_dropdown(ui, egui::Id::new(("nebula_dropdown", id)), width, &choices, selected);
+            changed = ui.add_enabled_ui(enabled, |ui| toggle_switch(ui, value)).inner.changed();
         });
     });
-    ui.separator();
-}
-
-fn setting_row(
-    ui: &mut egui::Ui,
-    value: &mut bool,
-    title: &str,
-    description: &str,
-    enabled: bool,
-) -> bool {
-    let changed = ui
-        .horizontal(|ui| {
-            ui.vertical(|ui| {
-                ui.spacing_mut().item_spacing.y = 3.0;
-                ui.label(
-                    RichText::new(title)
-                        .family(medium())
-                        .color(if enabled { TEXT } else { MUTED }),
-                );
-                ui.label(RichText::new(description).size(12.5).color(MUTED));
-            });
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.add_enabled_ui(enabled, |ui| toggle_switch(ui, value)).inner
-            })
-            .inner
-            .changed()
-        })
-        .inner;
-    ui.separator();
+    row_divider(ui);
     changed
 }
 
@@ -1862,23 +1826,23 @@ fn account_chip(ui: &mut egui::Ui, account: Option<&str>) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 let (avatar, _) = ui.allocate_exact_size(Vec2::splat(20.0), egui::Sense::hover());
-                let initial = account
-                    .and_then(|name| name.chars().next())
-                    .map(|c| c.to_uppercase().to_string())
-                    .unwrap_or_else(|| "?".to_string());
-                ui.painter().circle_filled(
-                    avatar.center(),
-                    10.0,
-                    if account.is_some() { VIOLET } else { Color32::from_rgb(70, 62, 96) },
-                );
-                ui.painter().text(
-                    avatar.center(),
-                    egui::Align2::CENTER_CENTER,
-                    initial,
-                    FontId::new(12.0, medium()),
-                    Color32::WHITE,
-                );
-                ui.label(RichText::new(account.unwrap_or("Account not loaded")).size(13.0).color(TEXT));
+                match account.and_then(|name| name.chars().next()) {
+                    Some(initial) => {
+                        ui.painter().circle_filled(avatar.center(), 10.0, VIOLET);
+                        ui.painter().text(
+                            avatar.center(),
+                            egui::Align2::CENTER_CENTER,
+                            initial.to_uppercase().to_string(),
+                            FontId::new(12.0, medium()),
+                            Color32::WHITE,
+                        );
+                    }
+                    None => {
+                        ui.painter().circle_filled(avatar.center(), 10.0, Color32::from_white_alpha(20));
+                        paint_icon(ui.painter(), Icon::User, avatar.center(), 12.0, MUTED, 0.0);
+                    }
+                }
+                ui.label(RichText::new(account.unwrap_or("Not signed in")).size(13.0).color(if account.is_some() { TEXT } else { MUTED }));
             });
         });
 }
@@ -1891,11 +1855,12 @@ fn nav_item(ui: &mut egui::Ui, page: Page, label: &str, selected: bool, compact:
     let painter = ui.painter();
     painter.rect_filled(rect, 10.0, Color32::from_white_alpha((hover * 10.0) as u8));
     if active > 0.0 {
-        painter.rect_filled(rect, 10.0, Color32::from_rgba_unmultiplied(139, 91, 249, (active * 70.0) as u8));
-        painter.rect_filled(
-            egui::Rect::from_min_size(rect.left_top() + Vec2::new(0.0, 12.0), Vec2::new(3.0, 20.0)),
-            2.0,
-            CORAL.gamma_multiply(active),
+        painter.rect_filled(rect, 10.0, Color32::from_rgba_unmultiplied(139, 91, 249, (active * 58.0) as u8));
+        painter.rect_stroke(
+            rect,
+            10.0,
+            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(214, 190, 255, (active * 70.0) as u8)),
+            egui::StrokeKind::Inside,
         );
     }
     let color = lerp_color(MUTED, TEXT, active.max(hover * 0.7));
@@ -1981,7 +1946,7 @@ fn draw_nav_icon(painter: &egui::Painter, page: Page, c: egui::Pos2, color: Colo
 /// The primary call to action: a violet-to-coral sunset gradient with a soft glow.
 /// Returns true when it was clicked while enabled.
 fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
-    let size = Vec2::new(ui.available_width().min(340.0), 56.0);
+    let size = Vec2::new(ui.available_width(), 56.0);
     let (full, response) = ui.allocate_exact_size(size, egui::Sense::click());
     let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered() && enabled, 0.15);
     let pressed = enabled && response.is_pointer_button_down_on();
@@ -3072,7 +3037,7 @@ mod gfx_tests {
         let k = GLASS_ALPHA as f32 / 255.0;
         let glass = [16.0_f32, 11.0, 36.0];
         // The inner card adds a faint white overlay on top of the glass.
-        let card = |c: f32| 0.047 * 255.0 + (1.0 - 0.047) * c;
+        let card = |c: f32| 0.035 * 255.0 + (1.0 - 0.035) * c;
         let bg: [u8; 3] = std::array::from_fn(|i| card(glass[i] * k + sky[i] * (1.0 - k)).round() as u8);
         for (name, color) in [
             ("TEXT", TEXT),

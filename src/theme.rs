@@ -17,7 +17,7 @@ pub(crate) const CORAL: Color32 = Color32::from_rgb(239, 124, 99);
 pub(crate) const CORAL_TEXT: Color32 = Color32::from_rgb(255, 168, 140);
 /// Opacity of the main glass panel. Higher keeps text readable over the bright sunset glow;
 /// lower shows more of the sunset. Text colours are chosen for at least 4.5:1 at this value.
-pub(crate) const GLASS_ALPHA: u8 = 140;
+pub(crate) const GLASS_ALPHA: u8 = 206;
 
 pub(crate) fn medium() -> FontFamily {
     FontFamily::Name("Horizon Geist Medium".into())
@@ -110,9 +110,9 @@ pub(crate) fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
 pub(crate) fn glass_frame(alpha: u8) -> Frame {
     Frame::NONE
         .fill(Color32::from_rgba_unmultiplied(16, 11, 36, alpha))
-        .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(26)))
-        .corner_radius(egui::CornerRadius::same(16))
-        .inner_margin(Margin::symmetric(28, 24))
+        .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(22)))
+        .corner_radius(egui::CornerRadius::same(20))
+        .inner_margin(Margin::symmetric(32, 28))
         .shadow(egui::epaint::Shadow {
             offset: [0, 8],
             blur: 24,
@@ -127,18 +127,18 @@ pub(crate) fn inner_card(highlight: bool) -> Frame {
         .fill(if highlight {
             Color32::from_rgba_unmultiplied(139, 91, 249, 52)
         } else {
-            Color32::from_white_alpha(12)
+            Color32::from_white_alpha(9)
         })
         .stroke(Stroke::new(
             1.0_f32,
             if highlight {
                 Color32::from_rgba_unmultiplied(214, 190, 255, 140)
             } else {
-                Color32::from_white_alpha(28)
+                Color32::from_white_alpha(22)
             },
         ))
-        .corner_radius(egui::CornerRadius::same(12))
-        .inner_margin(Margin::symmetric(16, 13))
+        .corner_radius(egui::CornerRadius::same(14))
+        .inner_margin(Margin::symmetric(20, 16))
 }
 
 /// A four-corner gradient quad (top-left, top-right, bottom-right, bottom-left).
