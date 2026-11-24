@@ -336,10 +336,8 @@ pub(crate) fn draw_nav_icon(painter: &egui::Painter, page: Page, c: egui::Pos2, 
     let p = |x: f32, y: f32| c + Vec2::new(x, y);
     match page {
         Page::Play => {
-            painter.add(egui::Shape::line(
-                vec![p(-8.0, -1.0), p(0.0, -8.0), p(8.0, -1.0)],
-                stroke,
-            ));
+            painter.line_segment([p(-8.0, -1.0), p(0.0, -8.0)], stroke);
+            painter.line_segment([p(0.0, -8.0), p(8.0, -1.0)], stroke);
             painter.line_segment([p(-6.0, -2.0), p(-6.0, 7.0)], stroke);
             painter.line_segment([p(6.0, -2.0), p(6.0, 7.0)], stroke);
             painter.line_segment([p(-6.0, 7.0), p(6.0, 7.0)], stroke);
@@ -351,18 +349,12 @@ pub(crate) fn draw_nav_icon(painter: &egui::Painter, page: Page, c: egui::Pos2, 
             );
         }
         Page::Performance => {
-            painter.add(egui::Shape::convex_polygon(
-                vec![
-                    p(2.5, -9.0),
-                    p(-4.5, 1.0),
-                    p(-0.5, 1.0),
-                    p(-2.5, 9.0),
-                    p(5.0, -2.0),
-                    p(1.0, -2.0),
-                ],
-                color,
-                Stroke::NONE,
-            ));
+            painter.line_segment([p(2.5, -9.0), p(-4.5, 1.0)], stroke);
+            painter.line_segment([p(-4.5, 1.0), p(-0.5, 1.0)], stroke);
+            painter.line_segment([p(-0.5, 1.0), p(-2.5, 9.0)], stroke);
+            painter.line_segment([p(-2.5, 9.0), p(5.0, -2.0)], stroke);
+            painter.line_segment([p(5.0, -2.0), p(1.0, -2.0)], stroke);
+            painter.line_segment([p(1.0, -2.0), p(2.5, -9.0)], stroke);
         }
         Page::Graphics => {
             painter.rect_stroke(
@@ -375,50 +367,30 @@ pub(crate) fn draw_nav_icon(painter: &egui::Painter, page: Page, c: egui::Pos2, 
             painter.line_segment([p(-4.5, 8.0), p(4.5, 8.0)], stroke);
         }
         Page::Shaders => {
-            painter.add(egui::Shape::convex_polygon(
-                vec![
-                    p(0.0, -8.5),
-                    p(2.0, -2.0),
-                    p(8.5, 0.0),
-                    p(2.0, 2.0),
-                    p(0.0, 8.5),
-                    p(-2.0, 2.0),
-                    p(-8.5, 0.0),
-                    p(-2.0, -2.0),
-                ],
-                color,
-                Stroke::NONE,
-            ));
-            painter.add(egui::Shape::convex_polygon(
-                vec![p(7.0, -9.0), p(8.1, -6.1), p(11.0, -5.0), p(8.1, -3.9), p(7.0, -1.0), p(5.9, -3.9), p(3.0, -5.0), p(5.9, -6.1)],
-                color.gamma_multiply(0.85),
-                Stroke::NONE,
-            ));
+            painter.line_segment([p(0.0, -8.5), p(0.0, 8.5)], stroke);
+            painter.line_segment([p(-8.5, 0.0), p(8.5, 0.0)], stroke);
+            painter.line_segment([p(-5.5, -5.5), p(5.5, 5.5)], stroke);
+            painter.line_segment([p(5.5, -5.5), p(-5.5, 5.5)], stroke);
+            painter.line_segment([p(7.0, -10.0), p(7.0, -4.0)], stroke);
+            painter.line_segment([p(4.0, -7.0), p(10.0, -7.0)], stroke);
         }
         Page::Diagnostics => {
             painter.circle_stroke(p(-6.0, 0.0), 2.0, stroke);
-            painter.add(egui::Shape::line(
-                vec![
-                    p(-3.0, 0.0),
-                    p(-0.5, 0.0),
-                    p(2.0, -6.0),
-                    p(5.0, 6.0),
-                    p(7.0, 0.0),
-                    p(9.0, 0.0),
-                ],
-                stroke,
-            ));
+            painter.line_segment([p(-3.0, 0.0), p(-0.5, 0.0)], stroke);
+            painter.line_segment([p(-0.5, 0.0), p(2.0, -6.0)], stroke);
+            painter.line_segment([p(2.0, -6.0), p(5.0, 6.0)], stroke);
+            painter.line_segment([p(5.0, 6.0), p(7.0, 0.0)], stroke);
+            painter.line_segment([p(7.0, 0.0), p(9.0, 0.0)], stroke);
         }
         Page::Settings => {
             for (y, knob) in [(-6.0_f32, -2.5_f32), (0.0, 3.0), (6.0, -1.5)] {
-                painter.line_segment([p(-9.0, y), p(9.0, y)], stroke);
-                painter.circle_filled(p(knob, y), 3.0, THEME.sidebar);
+                painter.line_segment([p(-9.0, y), p(knob - 3.5, y)], stroke);
+                painter.line_segment([p(knob + 3.5, y), p(9.0, y)], stroke);
                 painter.circle_stroke(p(knob, y), 3.0, stroke);
             }
         }
     }
 }
-
 /// Returns true when it was clicked while enabled.
 /// Primary launch action with a single brand surface and clear interaction states.
 pub(crate) fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
