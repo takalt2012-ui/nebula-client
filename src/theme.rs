@@ -121,24 +121,24 @@ pub(crate) fn glass_frame(alpha: u8) -> Frame {
         })
 }
 
-/// A lighter card nested inside the main panel. `highlight` marks hover or active state.
+/// A restrained nested surface. `highlight` marks hover or active state without a bright glass wash.
 pub(crate) fn inner_card(highlight: bool) -> Frame {
     Frame::NONE
         .fill(if highlight {
-            Color32::from_rgba_unmultiplied(139, 91, 249, 52)
+            Color32::from_rgba_unmultiplied(52, 36, 82, 218)
         } else {
-            Color32::from_white_alpha(9)
+            Color32::from_rgba_unmultiplied(19, 15, 33, 218)
         })
         .stroke(Stroke::new(
             1.0_f32,
             if highlight {
-                Color32::from_rgba_unmultiplied(214, 190, 255, 140)
+                Color32::from_rgba_unmultiplied(187, 147, 255, 148)
             } else {
-                Color32::from_white_alpha(22)
+                Color32::from_rgba_unmultiplied(216, 205, 239, 32)
             },
         ))
-        .corner_radius(egui::CornerRadius::same(14))
-        .inner_margin(Margin::symmetric(20, 16))
+        .corner_radius(egui::CornerRadius::same(12))
+        .inner_margin(Margin::symmetric(18, 14))
 }
 
 /// A four-corner gradient quad (top-left, top-right, bottom-right, bottom-left).
