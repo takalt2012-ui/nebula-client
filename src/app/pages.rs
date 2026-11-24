@@ -597,7 +597,7 @@ impl NebulaClient {
             ui,
             "SHADERS",
             "Shader Packs",
-            "Enable or disable a pack for the selected instance. Drop a .zip or .hshader anywhere on this page to install it.",
+            "Nebula Golden Hour is included automatically. Add more Horizon-native or classic shader packs by dropping them here.",
         );
 
         if self.shader_dir.is_none() {
@@ -612,24 +612,6 @@ impl NebulaClient {
         }
 
         let running = game_is_running();
-        let mut install_builtin = false;
-        panel_card(ui, card_frame(false), |ui| {
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.label(RichText::new("INCLUDED WITH NEBULA").size(11.5).family(semibold()).color(THEME.primary_bright));
-                    ui.label(RichText::new("Golden Hour · Horizon-native shader").family(medium()).color(THEME.text));
-                    ui.label(RichText::new("A lightweight warm-sky and subtle colour-grade pack, using Horizon shader API 0.1.").size(12.0).color(THEME.muted));
-                });
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if action_button(ui, ButtonKind::Primary, Some(Icon::Check), "Install & enable", 148.0).clicked() {
-                        install_builtin = true;
-                    }
-                });
-            });
-        });
-        if install_builtin {
-            self.install_builtin_shader_pack();
-        }
         let picked = self.shader_picked.as_str();
         let packs = &self.shader_packs;
         let mut disable_request = false;
@@ -695,31 +677,53 @@ impl NebulaClient {
         }
 
         let mut enable_request: Option<String> = None;
-        for pack in packs {
-            let active = !picked.is_empty() && (picked == pack.key || picked == pack.file);
-            panel_card(ui, card_frame(active), |ui| {
+        if packs.is_empty() {
+            ui.label(
+                RichText::new("No shader packs found in this instance's shaderpacks folder.")
+                    .color(THEME.muted),
+            );
+        } else {
+            panel_card(ui, card_frame(false), |ui| {
+                for (index, pack) in packs.iter().enumerate() {
+                    let active = !picked.is_empty() && (picked == pack.key || picked == pack.file);
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
-                            ui.label(RichText::new(&pack.title).family(medium()).color(THEME.text));
                             ui.horizontal(|ui| {
-                                ui.label(
-                                    RichText::new(if pack.native { "Horizon native" } else { "shaders/ format" })
-                                        .size(12.5)
-                                        .color(THEME.muted),
-                                );
-                                ui.label(
-                                    RichText::new(pack.file.as_str())
-                                        .size(12.5)
-                                        .color(THEME.muted),
-                                );
+                                ui.label(RichText::new(&pack.title).family(medium()).color(THEME.text));
+                                if pack.file == "Nebula Golden Hour" {
+                                    ui.label(
+                                        RichText::new("BUNDLED")
+                                            .size(10.5)
+                                            .family(semibold())
+                                            .color(THEME.primary_bright),
+                                    );
+                                }
                             });
+                            let format = if pack.native { "Horizon native" } else { "shaders/ format" };
+                            ui.label(
+                                RichText::new(format!("{format}  ·  {}", pack.file))
+                                    .size(12.0)
+                                    .color(THEME.muted),
+                            );
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             if active {
-                                ui.label(RichText::new("ENABLED").size(12.0).family(semibold()).color(THEME.success));
+                                Frame::NONE
+                                    .fill(Color32::from_rgba_unmultiplied(66, 170, 115, 24))
+                                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(113, 211, 151, 70)))
+                                    .corner_radius(egui::CornerRadius::same(8))
+                                    .inner_margin(Margin::symmetric(10, 5))
+                                    .show(ui, |ui| {
+                                        ui.label(
+                                            RichText::new("ACTIVE")
+                                                .size(11.0)
+                                                .family(semibold())
+                                                .color(THEME.success),
+                                        );
+                                    });
                             } else if ui
                                 .add_enabled_ui(!running, |ui| {
-                                    action_button(ui, ButtonKind::Primary, Some(Icon::Check), "Enable", 120.0)
+                                    action_button(ui, ButtonKind::Secondary, None, "Enable", 92.0)
                                 })
                                 .inner
                                 .clicked()
@@ -728,8 +732,13 @@ impl NebulaClient {
                             }
                         });
                     });
-                });
-            ui.add_space(8.0);
+                    if index + 1 < packs.len() {
+                        ui.add_space(7.0);
+                        ui.separator();
+                        ui.add_space(7.0);
+                    }
+                }
+            });
         }
 
         if let Some(key) = enable_request {
