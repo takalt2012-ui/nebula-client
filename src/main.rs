@@ -2,6 +2,7 @@
 //! It delegates managed game starts to Horizon's own `play` command so cache leases,
 //! instance configuration and account-session handoff remain correct.
 
+mod hud;
 mod scene;
 mod setup;
 mod theme;
@@ -19,36 +20,28 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Instant, SystemTime};
 
+use hud::{HudConfig, Preset, Widget};
 use setup::{SetupPoll, SetupRun, SetupStep};
 use theme::*;
 use widgets::*;
-
-const HUD_WIDGETS: [&str; 14] = ["effects", "items", "durability", "totems", "health", "cooldowns", "coordinates", "fps", "ping", "speed", "cps", "clock", "armor_mini", "pickups"];
-const HUD_FEATURE_LABELS: [(&str, &str); 14] = [
-    ("Effects", "Potion and status effects"), ("Items", "Consumable timers"),
-    ("Durability", "Equipment durability"), ("Totems", "Totems used"),
-    ("Health", "Player health tags"), ("Cooldowns", "Item cooldowns"),
-    ("Coordinates", "Position and facing"), ("FPS", "Frame rate"),
-    ("Ping", "Network latency"), ("Speed", "Movement speed"),
-    ("CPS", "Clicks per second"), ("Clock", "In-game time"),
-    ("Armor", "Compact armor HUD"), ("Recent pickups", "Recent item pickups"),
-];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Page {
     Play,
     Performance,
     Graphics,
+    Customize,
     Shaders,
     Diagnostics,
     Settings,
 }
 
 impl Page {
-    const ALL: [(Self, &'static str); 6] = [
+    const ALL: [(Self, &'static str); 7] = [
         (Self::Play, "Home"),
         (Self::Performance, "Performance"),
         (Self::Graphics, "Graphics"),
+        (Self::Customize, "Customize"),
         (Self::Shaders, "Shaders"),
         (Self::Diagnostics, "Diagnostics"),
         (Self::Settings, "Settings"),
@@ -168,7 +161,8 @@ struct NebulaClient {
     pending_game: Option<PendingGame>,
     setup: Option<SetupRun>,
     hud_config_path: Option<PathBuf>,
-    hud_features: [bool; 14],
+    hud: HudConfig,
+    hud_selected: Widget,
     shader_packs: Vec<ShaderPackEntry>,
     shader_picked: String,
     shader_dir: Option<PathBuf>,
@@ -199,7 +193,8 @@ impl NebulaClient {
             pending_game: None,
             setup: None,
             hud_config_path: None,
-            hud_features: [false; 14],
+            hud: HudConfig::default(),
+            hud_selected: Widget::Fps,
             shader_packs: Vec::new(),
             shader_picked: String::new(),
             shader_dir: None,
@@ -250,53 +245,25 @@ impl NebulaClient {
 
     fn load_hud_features(&mut self) {
         self.hud_config_path = None;
-        self.hud_features = [false; 14];
+        self.hud = HudConfig::default();
         let (Some(version), Some(launcher)) = (self.selected_version(), self.official_launcher.as_deref()) else { return; };
         let Some(tag) = version.root.file_name().and_then(|name| name.to_str()) else { return; };
         let Ok(instance) = selected_instance(launcher, tag) else { return; };
         let instance_root = horizon_data_root().join("horizon/instances").join(instance);
         if !instance_root.join("horizon-native-mods/basic_hud.hnmod").is_file() { return; }
         let path = instance_root.join("horizon-mods/.horizon-mod-data/basic_hud/config");
-        self.hud_config_path = Some(path.clone());
-        self.hud_features = [true, true, true, true, true, true, true, true, true, false, false, false, true, true];
-        if let Ok(config) = fs::read_to_string(&path) {
-            for (i, key) in HUD_WIDGETS.iter().enumerate() {
-                let name = format!("w.{key}");
-                if let Some(value) = config.split(';').find_map(|pair| pair.split_once('=').filter(|(k, _)| *k == name).map(|(_, v)| v)) {
-                    self.hud_features[i] = value.split(',').next().is_some_and(|enabled| enabled == "1");
-                }
-            }
-        }
+        self.hud = fs::read_to_string(&path).map(|text| HudConfig::parse(&text)).unwrap_or_default();
+        self.hud_config_path = Some(path);
     }
 
-    fn save_hud_feature(&mut self, index: usize, enabled: bool) {
-        let Some(path) = self.hud_config_path.as_ref() else {
-            self.status = Some(Status { message: "Basic HUD is not installed for this Horizon instance yet. Install it in Horizon, then refresh.".into(), error: true });
-            return;
-        };
-        let mut pairs = fs::read_to_string(path).unwrap_or_default().split(';').map(str::to_owned).collect::<Vec<_>>();
-        let key = format!("w.{}", HUD_WIDGETS[index]);
-        let mut found = false;
-        for pair in &mut pairs {
-            if pair.split_once('=').is_some_and(|(name, _)| name == key) {
-                if let Some((_, value)) = pair.split_once('=') {
-                    let mut fields = value.split(',').map(str::to_owned).collect::<Vec<_>>();
-                    if let Some(first) = fields.first_mut() { *first = if enabled { "1" } else { "0" }.into(); }
-                    *pair = format!("{key}={}", fields.join(","));
-                    found = true;
-                }
-                break;
-            }
-        }
-        if !found {
-            // The native mod understands the same compact widget record used by its editor.
-            pairs.push(format!("{key}={},0.01,0.02,1,auto,FFFFFF,000000,47,1,2,0,1,0", if enabled { "1" } else { "0" }));
-        }
-        let result = fs::create_dir_all(path.parent().unwrap_or(Path::new(".")))
-            .and_then(|()| fs::write(path, pairs.join(";")));
-        match result {
-            Ok(()) => { self.hud_features[index] = enabled; self.status = Some(Status { message: "Basic HUD setting saved. It will be active next time Horizon starts.".into(), error: false }); }
-            Err(error) => self.status = Some(Status { message: format!("Could not save Basic HUD setting: {error}"), error: true }),
+    fn save_hud(&mut self) {
+        let Some(path) = self.hud_config_path.as_deref() else { return; };
+        let written = path
+            .parent()
+            .map_or(Ok(()), fs::create_dir_all)
+            .and_then(|()| fs::write(path, self.hud.serialize()));
+        if let Err(error) = written {
+            self.status = Some(Status { message: format!("Could not save the HUD layout: {error}"), error: true });
         }
     }
 
@@ -641,7 +608,7 @@ impl NebulaClient {
                             .color(MUTED),
                     );
                     if !compact {
-                        ui.label(RichText::new("Ctrl + 1-6 switches pages").size(12.0).color(MUTED));
+                        ui.label(RichText::new("Ctrl + 1-7 switches pages").size(12.0).color(MUTED));
                     }
                 });
             });
@@ -1017,6 +984,212 @@ impl NebulaClient {
         self.status_line(ui);
     }
 
+    fn customize_page(&mut self, ui: &mut egui::Ui) {
+        page_header(
+            ui,
+            "CUSTOMIZE",
+            "Make the HUD yours",
+            "Drag widgets where you want them. Changes save as you go and apply the next time Horizon starts.",
+        );
+        if self.hud_config_path.is_none() {
+            ui.label(
+                RichText::new("The Basic HUD mod is not installed for the selected Horizon build. Install it from Horizon's Mods page, then refresh.")
+                    .color(MUTED),
+            );
+            return;
+        }
+        let locked = game_is_running();
+        if locked {
+            ui.label(RichText::new("Horizon is running. Close it to change the HUD: it rewrites this file when it exits.").color(CORAL_TEXT));
+            ui.add_space(6.0);
+        }
+        let mut commit = false;
+        ui.add_enabled_ui(!locked, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("PRESET").size(12.0).family(semibold()).color(CORAL_TEXT));
+                for preset in Preset::ALL {
+                    let response = premium_button(ui, ButtonKind::Glass, None, preset.label(), 96.0).on_hover_text(preset.hint());
+                    if response.clicked() {
+                        self.hud.apply(preset);
+                        commit = true;
+                    }
+                }
+            });
+            ui.add_space(12.0);
+            commit |= self.hud_preview(ui);
+            ui.add_space(16.0);
+            commit |= self.hud_widget_list(ui);
+            ui.add_space(12.0);
+            commit |= self.hud_style_editor(ui);
+        });
+        if commit {
+            self.save_hud();
+        }
+    }
+
+    /// A miniature game view where each enabled widget can be dragged. True when a drag ended.
+    fn hud_preview(&mut self, ui: &mut egui::Ui) -> bool {
+        const VIEW: [f32; 2] = [427.0, 240.0];
+        let width = ui.available_width().min(760.0);
+        let (rect, _) = ui.allocate_exact_size(Vec2::new(width, width * VIEW[1] / VIEW[0]), egui::Sense::hover());
+        let px = width / VIEW[0];
+        let painter = ui.painter_at(rect);
+        paint_gradient(
+            &painter,
+            rect,
+            Color32::from_rgb(22, 26, 56),
+            Color32::from_rgb(22, 26, 56),
+            Color32::from_rgb(58, 46, 70),
+            Color32::from_rgb(58, 46, 70),
+        );
+        let ground = egui::Rect::from_min_max(egui::pos2(rect.left(), rect.top() + rect.height() * 0.66), rect.max);
+        painter.rect_filled(ground, 0.0, Color32::from_rgb(34, 42, 30));
+        let slot = 20.0 * px;
+        let hotbar_left = rect.center().x - slot * 4.5;
+        for i in 0..9 {
+            let cell = egui::Rect::from_min_size(
+                egui::pos2(hotbar_left + slot * i as f32, rect.bottom() - slot - 3.0 * px),
+                Vec2::splat(slot),
+            );
+            painter.rect_stroke(cell, 0.0, Stroke::new(1.0_f32, Color32::from_white_alpha(70)), egui::StrokeKind::Inside);
+        }
+        let mid = rect.center();
+        let arm = 4.0 * px;
+        let cross = Stroke::new(1.0_f32, Color32::from_white_alpha(150));
+        painter.line_segment([mid - Vec2::new(arm, 0.0), mid + Vec2::new(arm, 0.0)], cross);
+        painter.line_segment([mid - Vec2::new(0.0, arm), mid + Vec2::new(0.0, arm)], cross);
+
+        let mut dropped = false;
+        for widget in Widget::ALL {
+            let style = *self.hud.style(widget);
+            if !style.enabled {
+                continue;
+            }
+            let size = widget.preview_size();
+            let top_left = hud::place(&style, size, VIEW);
+            let area = egui::Rect::from_min_size(
+                rect.min + Vec2::new(top_left[0], top_left[1]) * px,
+                Vec2::new(size[0], size[1]) * style.scale * px,
+            );
+            let response = ui
+                .interact(area, egui::Id::new(("hud_widget", widget.key())), egui::Sense::click_and_drag())
+                .on_hover_cursor(egui::CursorIcon::Grab);
+            if response.clicked() || response.drag_started() {
+                self.hud_selected = widget;
+            }
+            if response.dragged() {
+                let delta = response.drag_delta() / px;
+                let [x, y] = hud::normalise(&style, size, VIEW, [top_left[0] + delta.x, top_left[1] + delta.y]);
+                let target = self.hud.style_mut(widget);
+                (target.x, target.y) = (x, y);
+            }
+            dropped |= response.drag_stopped();
+
+            let [br, bg, bb] = style.background;
+            let alpha = (f32::from(style.opacity) * 2.55) as u8;
+            painter.rect_filled(area, 2.0, Color32::from_rgba_unmultiplied(br, bg, bb, alpha));
+            if self.hud_selected == widget {
+                painter.rect_stroke(area.expand(1.0), 3.0, Stroke::new(1.5_f32, PURPLE_BRIGHT), egui::StrokeKind::Outside);
+            }
+            let [ar, ag, ab] = style.accent;
+            let ink = style.text.map_or(Color32::WHITE, |[r, g, b]| Color32::from_rgb(r, g, b));
+            let font = FontId::proportional(8.0 * px * style.scale);
+            let (label, value) = widget.sample();
+            let label = painter.layout_no_wrap(format!("{label} "), font.clone(), Color32::from_rgb(ar, ag, ab));
+            let value = painter.layout_no_wrap(value.to_owned(), font, ink);
+            let inset = style.padding * px * style.scale;
+            let top = area.center().y - label.size().y * 0.5;
+            let value_at = egui::pos2(area.left() + inset + label.size().x, top);
+            painter.galley(egui::pos2(area.left() + inset, top), label, Color32::WHITE);
+            painter.galley(value_at, value, Color32::WHITE);
+        }
+        dropped
+    }
+
+    fn hud_widget_list(&mut self, ui: &mut egui::Ui) -> bool {
+        let mut commit = false;
+        glass_card(ui, inner_card(false), |ui| {
+            ui.label(RichText::new("WIDGETS").size(12.0).family(semibold()).color(CORAL_TEXT));
+            ui.add_space(6.0);
+            egui::Grid::new("hud_widget_list").num_columns(4).spacing([18.0, 8.0]).show(ui, |ui| {
+                for (n, widget) in Widget::ALL.into_iter().enumerate() {
+                    let mut on = self.hud.style(widget).enabled;
+                    if toggle_switch(ui, &mut on).changed() {
+                        self.hud.style_mut(widget).enabled = on;
+                        commit = true;
+                    }
+                    let label = RichText::new(widget.label()).family(medium()).color(if self.hud_selected == widget { PURPLE_BRIGHT } else { TEXT });
+                    if ui.add(egui::Label::new(label).sense(egui::Sense::click())).clicked() {
+                        self.hud_selected = widget;
+                    }
+                    if n % 2 == 1 {
+                        ui.end_row();
+                    }
+                }
+            });
+        });
+        commit
+    }
+
+    fn hud_style_editor(&mut self, ui: &mut egui::Ui) -> bool {
+        let widget = self.hud_selected;
+        let mut commit = false;
+        glass_card(ui, inner_card(false), |ui| {
+            ui.label(RichText::new(format!("STYLE  ·  {}", widget.label().to_uppercase())).size(12.0).family(semibold()).color(CORAL_TEXT));
+            ui.add_space(8.0);
+            let style = self.hud.style_mut(widget);
+
+            ui.label(RichText::new("Size").family(medium()).color(TEXT));
+            let mut scale = (style.scale * 100.0).round() as u32;
+            commit |= premium_slider(ui, &mut scale, 50..=300, "%");
+            style.scale = scale as f32 / 100.0;
+
+            ui.label(RichText::new("Background opacity").family(medium()).color(TEXT));
+            let mut opacity = u32::from(style.opacity);
+            commit |= premium_slider(ui, &mut opacity, 0..=100, "%");
+            style.opacity = opacity.min(100) as u8;
+
+            ui.label(RichText::new("Padding").family(medium()).color(TEXT));
+            let mut padding = style.padding.round() as u32;
+            commit |= premium_slider(ui, &mut padding, 0..=12, " px");
+            style.padding = padding as f32;
+
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Background").color(MUTED));
+                commit |= egui::color_picker::color_edit_button_srgb(ui, &mut style.background).changed();
+                ui.add_space(12.0);
+                ui.label(RichText::new("Label").color(MUTED));
+                commit |= egui::color_picker::color_edit_button_srgb(ui, &mut style.accent).changed();
+                ui.add_space(12.0);
+                ui.label(RichText::new("Text").color(MUTED));
+                let mut rgb = style.text.unwrap_or([255, 255, 255]);
+                if egui::color_picker::color_edit_button_srgb(ui, &mut rgb).changed() {
+                    style.text = Some(rgb);
+                    commit = true;
+                }
+            });
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                let mut status_colours = style.text.is_none();
+                if toggle_switch(ui, &mut status_colours).changed() {
+                    style.text = if status_colours { None } else { Some([255, 255, 255]) };
+                    commit = true;
+                }
+                ui.label(RichText::new("Status colours").family(medium()).color(TEXT));
+                ui.add_space(16.0);
+                commit |= toggle_switch(ui, &mut style.shadow).changed();
+                ui.label(RichText::new("Text shadow").family(medium()).color(TEXT));
+            });
+            ui.add_space(12.0);
+            if premium_button(ui, ButtonKind::Ghost, Some(Icon::Reset), "Reset this widget", 0.0).clicked() {
+                *style = widget.default_style();
+                commit = true;
+            }
+        });
+        commit
+    }
+
     fn performance_page(&mut self, ui: &mut egui::Ui) {
         page_header(
             ui,
@@ -1024,31 +1197,6 @@ impl NebulaClient {
             "Performance Mode",
             "Only supported, game-scoped settings are applied. No system-wide tuning is changed.",
         );
-        glass_card(ui, inner_card(false), |ui| {
-            ui.label(RichText::new("IN-GAME HUD  ·  BASIC HUD").size(12.0).family(semibold()).color(PURPLE_BRIGHT));
-            ui.label(RichText::new(if self.hud_config_path.is_some() { "These switches update the installed native mod." } else { "Basic HUD settings are not available for the selected instance." }).size(12.5).color(MUTED));
-            ui.add_space(8.0);
-            egui::Grid::new("nebula_hud_features").num_columns(2).spacing([18.0, 5.0]).show(ui, |ui| {
-                for (index, (name, hint)) in HUD_FEATURE_LABELS.iter().enumerate() {
-                    let mut active = self.hud_features[index];
-                    let hud_available = self.hud_config_path.is_some();
-                    let response = ui
-                        .add_enabled_ui(hud_available, |ui| {
-                            ui.horizontal(|ui| {
-                                let switch = toggle_switch(ui, &mut active);
-                                ui.label(RichText::new(*name).family(medium()).color(TEXT));
-                                switch
-                            })
-                            .inner
-                        })
-                        .inner;
-                    ui.label(RichText::new(*hint).size(12.5).color(MUTED));
-                    ui.end_row();
-                    if response.changed() { self.save_hud_feature(index, active); }
-                }
-            });
-        });
-        ui.add_space(24.0);
 
         let changed = setting_row(
             ui,
@@ -1492,14 +1640,15 @@ impl eframe::App for NebulaClient {
         self.poll_game_start(ctx);
         self.poll_setup(ctx);
         self.sunset.paint(ctx);
-        // Ctrl/Cmd + 1..6 jumps to a page.
-        const PAGE_KEYS: [egui::Key; 6] = [
+        // Ctrl/Cmd + 1..7 jumps to a page.
+        const PAGE_KEYS: [egui::Key; 7] = [
             egui::Key::Num1,
             egui::Key::Num2,
             egui::Key::Num3,
             egui::Key::Num4,
             egui::Key::Num5,
             egui::Key::Num6,
+            egui::Key::Num7,
         ];
         let hotkey = ctx.input(|input| {
             if !input.modifiers.command {
@@ -1537,6 +1686,7 @@ impl eframe::App for NebulaClient {
                             Page::Play => self.play_page(ui, ctx),
                             Page::Performance => self.performance_page(ui),
                             Page::Graphics => self.graphics_page(ui),
+                            Page::Customize => self.customize_page(ui),
                             Page::Shaders => self.shaders_page(ui, ctx),
                             Page::Diagnostics => self.diagnostics_page(ui),
                             Page::Settings => self.settings_page(ui),
@@ -1800,6 +1950,12 @@ fn draw_nav_icon(painter: &egui::Painter, page: Page, c: egui::Pos2, color: Colo
             );
             painter.line_segment([p(0.0, 4.0), p(0.0, 8.0)], s);
             painter.line_segment([p(-4.5, 8.0), p(4.5, 8.0)], s);
+        }
+        Page::Customize => {
+            let frame = egui::Rect::from_min_max(p(-9.0, -7.0), p(9.0, 7.0));
+            painter.rect_stroke(frame, 2.0, s, egui::StrokeKind::Inside);
+            painter.rect_filled(egui::Rect::from_min_max(p(-6.0, -4.0), p(-1.0, -1.0)), 1.0, color);
+            painter.rect_filled(egui::Rect::from_min_max(p(2.0, 1.5), p(6.0, 4.0)), 1.0, color);
         }
         Page::Shaders => {
             painter.circle_stroke(c, 4.0, s);
