@@ -99,8 +99,8 @@ impl NebulaClient {
                 ui.label(RichText::new("NEBULA  /  HORIZON 26.3").size(12.0).family(semibold()).color(THEME.primary_bright));
                 ui.add_space(3.0);
                 ui.label(
-                    RichText::new("Your world,\nat full speed.")
-                        .font(FontId::new(36.0, semibold()))
+                    RichText::new("Your world, at full speed.")
+                        .font(FontId::new(30.0, semibold()))
                         .color(THEME.text),
                 );
                 ui.add_space(6.0);
@@ -128,9 +128,9 @@ impl NebulaClient {
                 });
             });
         });
-        ui.add_space(16.0);
+        ui.add_space(10.0);
         ui.separator();
-        ui.add_space(8.0);
+        ui.add_space(4.0);
 
         let performance_changed = panel_card(ui, card_frame(false), |ui| {
             ui.horizontal(|ui| {
@@ -159,7 +159,7 @@ impl NebulaClient {
         if performance_changed {
             self.persist_selection();
         }
-        ui.add_space(16.0);
+        ui.add_space(9.0);
 
         let previous_version = self.selected_version;
         labeled_combo(
@@ -241,7 +241,7 @@ impl NebulaClient {
             self.persist_selection();
         }
 
-        ui.add_space(14.0);
+        ui.add_space(8.0);
         // Same four requirements the launch path checks, surfaced before the click.
         let blocker = if self.official_launcher.is_none() {
             Some("Horizon's sign-in helper was not found.")
@@ -254,33 +254,29 @@ impl NebulaClient {
         } else {
             None
         };
-        if play_button(ui, blocker.is_none() && !starting, starting) {
-            self.launch(ctx);
-        }
-        if starting {
-            ui.add_space(8.0);
-            launch_progress(ui, ctx.input(|input| input.time) as f32);
-            // Keeps the indeterminate sweep animating while Horizon starts.
-            ctx.request_repaint_after(std::time::Duration::from_millis(50));
-        } else if let Some(reason) = blocker {
-            ui.add_space(6.0);
-            ui.label(RichText::new(reason).size(12.5).color(THEME.muted));
-        }
-        ui.add_space(8.0);
         ui.horizontal(|ui| {
-            if action_button(ui, ButtonKind::Ghost, Some(Icon::Refresh), "Refresh builds", 0.0).clicked() {
+            if play_button(ui, blocker.is_none() && !starting, starting) {
+                self.launch(ctx);
+            }
+            if action_button(ui, ButtonKind::Ghost, Some(Icon::Refresh), "Refresh builds", 148.0).clicked() {
                 self.refresh();
                 self.status = Some(Status {
                     message: "Build list refreshed.".into(),
                     kind: StatusKind::Success,
                 });
             }
-            if running {
-                ui.label(
-                    RichText::new("A Horizon client is already running.").color(THEME.primary_bright),
-                );
-            }
         });
+        if starting {
+            ui.add_space(6.0);
+            launch_progress(ui, ctx.input(|input| input.time) as f32);
+            ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        } else if let Some(reason) = blocker {
+            ui.add_space(4.0);
+            ui.label(RichText::new(reason).size(12.5).color(THEME.muted));
+        }
+        if running {
+            ui.label(RichText::new("A Horizon client is already running.").color(THEME.primary_bright));
+        }
         self.status_line(ui);
     }
 
@@ -616,6 +612,24 @@ impl NebulaClient {
         }
 
         let running = game_is_running();
+        let mut install_builtin = false;
+        panel_card(ui, card_frame(false), |ui| {
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(RichText::new("INCLUDED WITH NEBULA").size(11.5).family(semibold()).color(THEME.primary_bright));
+                    ui.label(RichText::new("Golden Hour · Horizon-native shader").family(medium()).color(THEME.text));
+                    ui.label(RichText::new("A lightweight warm-sky and subtle colour-grade pack, using Horizon shader API 0.1.").size(12.0).color(THEME.muted));
+                });
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if action_button(ui, ButtonKind::Primary, Some(Icon::Check), "Install & enable", 148.0).clicked() {
+                        install_builtin = true;
+                    }
+                });
+            });
+        });
+        if install_builtin {
+            self.install_builtin_shader_pack();
+        }
         let picked = self.shader_picked.as_str();
         let packs = &self.shader_packs;
         let mut disable_request = false;
