@@ -1385,7 +1385,7 @@ impl NebulaClient {
                                     });
                             } else if ui
                                 .add_enabled_ui(!running, |ui| {
-                                    premium_button(ui, ButtonKind::Primary, None, "Enable", 96.0)
+                                    premium_button(ui, ButtonKind::Glass, None, "Enable", 92.0)
                                 })
                                 .inner
                                 .clicked()
