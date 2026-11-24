@@ -145,10 +145,11 @@ impl SystemClipboard {
 
 impl Clipboard for SystemClipboard {
     fn get(&mut self) -> String {
-        let Some(system) = self.system() else {
-            return self.copied.clone().unwrap_or_default();
+        let result = match self.system() {
+            Some(system) => system.get_text(),
+            None => return self.copied.clone().unwrap_or_default(),
         };
-        match system.get_text() {
+        match result {
             Ok(text) if !text.is_empty() => text,
             Ok(_) | Err(arboard::Error::ContentNotAvailable) => {
                 self.copied.clone().unwrap_or_default()
