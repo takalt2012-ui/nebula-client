@@ -390,6 +390,53 @@ pub(super) fn write_picked_shader(path: &Path, value: &str) -> Result<(), String
     fs::rename(&temporary, path).map_err(|error| error.to_string())
 }
 
+/// Ensures the bundled native shader is available in the selected instance.
+///
+/// The shader sources are embedded at compile time so packaged launchers do not depend on
+/// the repository checkout being present on the user's machine. Existing user edits are kept;
+/// only missing files are provisioned.
+pub(super) fn ensure_builtin_shader_pack(shaderpacks: &Path) -> Result<(), String> {
+    let destination = shaderpacks.join("Nebula Golden Hour");
+    let files: [(&str, &str); 5] = [
+        (
+            "horizon-shaders.toml",
+            include_str!("../../assets/nebula-golden-hour/horizon-shaders.toml"),
+        ),
+        (
+            "common.wgsl",
+            include_str!("../../assets/nebula-golden-hour/common.wgsl"),
+        ),
+        (
+            "sky.wgsl",
+            include_str!("../../assets/nebula-golden-hour/sky.wgsl"),
+        ),
+        (
+            "post/glow.wgsl",
+            include_str!("../../assets/nebula-golden-hour/post/glow.wgsl"),
+        ),
+        (
+            "post/grade.wgsl",
+            include_str!("../../assets/nebula-golden-hour/post/grade.wgsl"),
+        ),
+    ];
+
+    for (relative_path, source) in files {
+        let path = destination.join(relative_path);
+        if path.is_file() {
+            continue;
+        }
+        let parent = path
+            .parent()
+            .ok_or_else(|| format!("invalid bundled shader path: {}", path.display()))?;
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("could not create {}: {error}", parent.display()))?;
+        fs::write(&path, source)
+            .map_err(|error| format!("could not write {}: {error}", path.display()))?;
+    }
+
+    Ok(())
+}
+
 /// Scans `shaderpacks/` for Horizon-native and classic `shaders/` packs.
 pub(super) fn scan_shader_packs(dir: &Path) -> Vec<ShaderPackEntry> {
     let Ok(entries) = fs::read_dir(dir) else {
@@ -442,9 +489,12 @@ pub(super) fn scan_shader_packs(dir: &Path) -> Vec<ShaderPackEntry> {
             });
         }
     }
-    // Horizon's own packs first, then classic; each group by title (matches the game's list).
+    // Keep the bundled Nebula pack immediately visible, then native and classic packs.
     packs.sort_by(|a, b| {
-        (!a.native, a.title.to_lowercase()).cmp(&(!b.native, b.title.to_lowercase()))
+        let a_builtin = a.file != "Nebula Golden Hour";
+        let b_builtin = b.file != "Nebula Golden Hour";
+        (a_builtin, !a.native, a.title.to_lowercase())
+            .cmp(&(b_builtin, !b.native, b.title.to_lowercase()))
     });
     packs
 }
