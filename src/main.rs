@@ -2650,9 +2650,12 @@ fn scan_shader_packs(dir: &Path) -> Vec<ShaderPackEntry> {
             });
         }
     }
-    // Horizon's own packs first, then classic; each group by title (matches the game's list).
+    // Put the bundled Nebula shader first so it is immediately visible in the library.
     packs.sort_by(|a, b| {
-        (!a.native, a.title.to_lowercase()).cmp(&(!b.native, b.title.to_lowercase()))
+        let a_builtin = a.file != "Nebula Golden Hour";
+        let b_builtin = b.file != "Nebula Golden Hour";
+        (a_builtin, !a.native, a.title.to_lowercase())
+            .cmp(&(b_builtin, !b.native, b.title.to_lowercase()))
     });
     packs
 }
