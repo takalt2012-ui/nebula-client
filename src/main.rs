@@ -5,6 +5,7 @@
 mod hud;
 mod scene;
 mod setup;
+mod shaders;
 mod theme;
 mod widgets;
 
@@ -22,6 +23,7 @@ use std::time::{Instant, SystemTime};
 
 use hud::{HudConfig, Preset, Widget};
 use setup::{SetupPoll, SetupRun, SetupStep};
+use shaders::ensure_builtin_shader_pack;
 use theme::*;
 use widgets::*;
 
@@ -282,6 +284,12 @@ impl NebulaClient {
         let instance_root = horizon_data_root().join("horizon/instances").join(instance);
         let graphics = instance_root.join("horizon-graphics.txt");
         let shader_dir = instance_root.join("shaderpacks");
+        if let Err(error) = ensure_builtin_shader_pack(&shader_dir) {
+            self.status = Some(Status {
+                message: format!("Could not install the bundled Nebula Golden Hour shader: {error}"),
+                error: true,
+            });
+        }
         self.shader_picked = read_picked_shader(&graphics);
         self.shader_packs = scan_shader_packs(&shader_dir);
         self.shader_graphics = Some(graphics);
