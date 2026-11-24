@@ -209,15 +209,6 @@ pub(crate) enum Icon {
     User,
 }
 
-pub(crate) fn arc_points(center: egui::Pos2, radius: f32, start: f32, sweep: f32, steps: usize) -> Vec<egui::Pos2> {
-    (0..=steps)
-        .map(|i| {
-            let (sin, cos) = (start + sweep * i as f32 / steps as f32).sin_cos();
-            center + Vec2::new(cos, sin) * radius
-        })
-        .collect()
-}
-
 pub(crate) fn rotated(v: Vec2, angle: f32) -> Vec2 {
     let (sin, cos) = angle.sin_cos();
     Vec2::new(v.x * cos - v.y * sin, v.x * sin + v.y * cos)
