@@ -1250,12 +1250,8 @@ impl NebulaClient {
     }
 
     fn shaders_page(&mut self, ui: &mut egui::Ui, ctx: &Context) {
-        // Install packs dropped anywhere on this page.
         let dropped: Vec<PathBuf> = ctx
-            .input(|input| input.raw.dropped_files.clone())
-            .into_iter()
-            .filter_map(|file| file.path)
-            .collect();
+            .input(|input| input.raw.dropped_files.iter().filter_map(|file| file.path.clone()).collect());
         for path in dropped {
             self.install_shader_pack(&path);
         }
@@ -1264,7 +1260,7 @@ impl NebulaClient {
             ui,
             "SHADERS",
             "Shader Packs",
-            "Enable or disable a pack for the selected instance. Drop a .zip or .hshader anywhere on this page to install it.",
+            "Nebula Golden Hour is included automatically. Drop a .zip or .hshader here to add another pack.",
         );
 
         if self.shader_dir.is_none() {
@@ -1279,92 +1275,117 @@ impl NebulaClient {
         }
 
         let running = game_is_running();
-        let picked = self.shader_picked.clone();
-        let packs = self.shader_packs.clone();
+        let picked = self.shader_picked.as_str();
+        let packs = self.shader_packs.as_slice();
+        let mut disable_request = false;
 
-        // Current pick / off state.
         glass_card(ui, inner_card(false), |ui| {
-                ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new("ACTIVE").size(12.0).family(semibold()).color(PURPLE_BRIGHT));
-                        if picked.is_empty() {
-                            ui.label(RichText::new("Shaders off (vanilla rendering)").color(TEXT));
-                        } else {
-                            let title = packs
-                                .iter()
-                                .find(|pack| pack.key == picked || pack.file == picked)
-                                .map(|pack| pack.title.clone())
-                                .unwrap_or_else(|| picked.clone());
-                            ui.label(RichText::new(title).family(medium()).color(SUCCESS));
-                            ui.label(RichText::new(&picked).size(12.5).monospace().color(MUTED));
-                        }
-                    });
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if !picked.is_empty()
-                            && ui
-                                .add_enabled_ui(!running, |ui| {
-                                    premium_button(ui, ButtonKind::Glass, Some(Icon::Power), "Disable", 120.0)
-                                })
-                                .inner
-                                .clicked()
-                        {
-                            self.set_picked_shader(String::new());
-                        }
-                    });
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(RichText::new("ACTIVE SHADER").size(11.5).family(semibold()).color(PURPLE_BRIGHT));
+                    if picked.is_empty() {
+                        ui.label(RichText::new("Vanilla rendering").family(medium()).color(TEXT));
+                        ui.label(RichText::new("No shader pack is currently selected").size(12.0).color(MUTED));
+                    } else {
+                        let title = packs
+                            .iter()
+                            .find(|pack| pack.key == picked || pack.file == picked)
+                            .map(|pack| pack.title.as_str())
+                            .unwrap_or(picked);
+                        ui.label(RichText::new(title).family(medium()).color(SUCCESS));
+                        ui.label(RichText::new(picked).size(12.0).monospace().color(MUTED));
+                    }
+                });
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if !picked.is_empty()
+                        && ui
+                            .add_enabled_ui(!running, |ui| {
+                                premium_button(ui, ButtonKind::Glass, None, "Disable", 104.0)
+                            })
+                            .inner
+                            .clicked()
+                    {
+                        disable_request = true;
+                    }
                 });
             });
+        });
 
         ui.add_space(10.0);
         let hovering = ctx.input(|input| !input.raw.hovered_files.is_empty());
         glass_card(ui, inner_card(hovering), |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.label(
-                        RichText::new("Drop a shader pack here to install")
-                            .family(medium())
-                            .color(TEXT),
-                    );
-                    ui.label(
-                        RichText::new(".zip (shaders/ format) or .hshader (Horizon native)")
-                            .size(12.5)
-                            .color(MUTED),
-                    );
-                });
+            ui.vertical_centered(|ui| {
+                ui.label(
+                    RichText::new("Drop a shader pack to install")
+                        .family(medium())
+                        .color(TEXT),
+                );
+                ui.label(
+                    RichText::new(".zip for shaders/ packs  ·  .hshader for Horizon native packs")
+                        .size(12.0)
+                        .color(MUTED),
+                );
             });
+        });
 
         ui.add_space(16.0);
-        ui.label(RichText::new("INSTALLED PACKS").size(12.0).family(semibold()).color(PURPLE_BRIGHT));
-        ui.add_space(6.0);
+        ui.label(RichText::new("INSTALLED PACKS").size(11.5).family(semibold()).color(PURPLE_BRIGHT));
+        ui.add_space(7.0);
 
+        let mut enable_request: Option<String> = None;
         if packs.is_empty() {
             ui.label(
                 RichText::new("No shader packs found in this instance's shaderpacks folder.")
                     .color(MUTED),
             );
-        }
-
-        let mut enable_request: Option<String> = None;
-        for pack in &packs {
-            let active = !picked.is_empty() && (picked == pack.key || picked == pack.file);
-            glass_card(ui, inner_card(active), |ui| {
+        } else {
+            glass_card(ui, inner_card(false), |ui| {
+                for (index, pack) in packs.iter().enumerate() {
+                    let active = !picked.is_empty() && (picked == pack.key || picked == pack.file);
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
-                            ui.label(RichText::new(&pack.title).family(medium()).color(TEXT));
-                            ui.label(
-                                RichText::new(format!(
-                                    "{}  ·  {}",
-                                    if pack.native { "Horizon native" } else { "shaders/ format" },
-                                    pack.file
-                                ))
-                                .size(12.5)
-                                .color(MUTED),
-                            );
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new(&pack.title).family(medium()).color(TEXT));
+                                if pack.file == "Nebula Golden Hour" {
+                                    ui.label(
+                                        RichText::new("BUNDLED")
+                                            .size(10.0)
+                                            .family(semibold())
+                                            .color(PURPLE_BRIGHT),
+                                    );
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label(
+                                    RichText::new(if pack.native { "Horizon native" } else { "shaders/ format" })
+                                        .size(12.0)
+                                        .color(MUTED),
+                                );
+                                ui.label(
+                                    RichText::new(pack.file.as_str())
+                                        .size(12.0)
+                                        .color(MUTED),
+                                );
+                            });
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             if active {
-                                ui.label(RichText::new("ENABLED").size(12.0).family(semibold()).color(SUCCESS));
+                                Frame::NONE
+                                    .fill(Color32::from_rgba_unmultiplied(75, 180, 124, 24))
+                                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(119, 220, 160, 76)))
+                                    .corner_radius(egui::CornerRadius::same(8))
+                                    .inner_margin(Margin::symmetric(10, 5))
+                                    .show(ui, |ui| {
+                                        ui.label(
+                                            RichText::new("ACTIVE")
+                                                .size(10.5)
+                                                .family(semibold())
+                                                .color(SUCCESS),
+                                        );
+                                    });
                             } else if ui
                                 .add_enabled_ui(!running, |ui| {
-                                    premium_button(ui, ButtonKind::Primary, Some(Icon::Check), "Enable", 120.0)
+                                    premium_button(ui, ButtonKind::Primary, None, "Enable", 96.0)
                                 })
                                 .inner
                                 .clicked()
@@ -1373,12 +1394,19 @@ impl NebulaClient {
                             }
                         });
                     });
-                });
-            ui.add_space(8.0);
+                    if index + 1 < packs.len() {
+                        ui.add_space(7.0);
+                        ui.separator();
+                        ui.add_space(7.0);
+                    }
+                }
+            });
         }
 
         if let Some(key) = enable_request {
             self.set_picked_shader(key);
+        } else if disable_request {
+            self.set_picked_shader(String::new());
         }
 
         ui.add_space(6.0);
