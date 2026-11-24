@@ -669,13 +669,6 @@ impl NebulaClient {
         ui.label(RichText::new("INSTALLED PACKS").size(12.0).family(semibold()).color(THEME.primary_bright));
         ui.add_space(6.0);
 
-        if packs.is_empty() {
-            ui.label(
-                RichText::new("No shader packs found in this instance's shaderpacks folder.")
-                    .color(THEME.muted),
-            );
-        }
-
         let mut enable_request: Option<String> = None;
         if packs.is_empty() {
             ui.label(
