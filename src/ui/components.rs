@@ -208,19 +208,19 @@ pub(crate) fn main_panel_frame(alpha: u8) -> Frame {
 pub(crate) fn card_frame(highlight: bool) -> Frame {
     let (fill, border) = if highlight {
         (
-            Color32::from_rgba_unmultiplied(123, 78, 245, 28),
-            Color32::from_rgba_unmultiplied(187, 147, 255, 72),
+            Color32::from_rgb(43, 32, 68),
+            Color32::from_rgba_unmultiplied(167, 132, 246, 150),
         )
     } else {
         (
-            Color32::from_rgba_unmultiplied(24, 20, 40, 160),
-            Color32::from_white_alpha(20),
+            Color32::from_rgb(25, 22, 39),
+            Color32::from_rgb(58, 52, 76),
         )
     };
     Frame::NONE
         .fill(fill)
         .stroke(Stroke::new(1.0_f32, border))
-        .corner_radius(egui::CornerRadius::same(10))
+        .corner_radius(egui::CornerRadius::same(12))
         .inner_margin(Margin::symmetric(16, 13))
 }
 
@@ -330,52 +330,90 @@ pub(crate) fn nav_item(ui: &mut egui::Ui, page: Page, label: &str, selected: boo
     }
 }
 
-/// Small line icons drawn with the painter so they stay crisp and need no icon font.
+/// A matched set of compact outline glyphs, drawn in the same 18px optical grid.
 pub(crate) fn draw_nav_icon(painter: &egui::Painter, page: Page, c: egui::Pos2, color: Color32) {
-    let s = Stroke::new(1.6_f32, color);
+    let stroke = Stroke::new(1.8_f32, color);
     let p = |x: f32, y: f32| c + Vec2::new(x, y);
     match page {
         Page::Play => {
-            painter.line_segment([p(-8.0, 0.0), p(0.0, -8.0)], s);
-            painter.line_segment([p(0.0, -8.0), p(8.0, 0.0)], s);
+            painter.add(egui::Shape::line(
+                vec![p(-8.0, -1.0), p(0.0, -8.0), p(8.0, -1.0)],
+                stroke,
+            ));
+            painter.line_segment([p(-6.0, -2.0), p(-6.0, 7.0)], stroke);
+            painter.line_segment([p(6.0, -2.0), p(6.0, 7.0)], stroke);
+            painter.line_segment([p(-6.0, 7.0), p(6.0, 7.0)], stroke);
             painter.rect_stroke(
-                egui::Rect::from_min_max(p(-5.5, 0.0), p(5.5, 8.0)),
-                1.5,
-                s,
+                egui::Rect::from_min_max(p(-1.8, 2.0), p(1.8, 7.0)),
+                1.0,
+                Stroke::new(1.5_f32, color),
                 egui::StrokeKind::Inside,
             );
         }
         Page::Performance => {
-            painter.line_segment([p(2.5, -9.0), p(-4.0, 1.0)], s);
-            painter.line_segment([p(-4.0, 1.0), p(4.0, 1.0)], s);
-            painter.line_segment([p(4.0, 1.0), p(-2.5, 9.0)], s);
+            painter.add(egui::Shape::convex_polygon(
+                vec![
+                    p(2.5, -9.0),
+                    p(-4.5, 1.0),
+                    p(-0.5, 1.0),
+                    p(-2.5, 9.0),
+                    p(5.0, -2.0),
+                    p(1.0, -2.0),
+                ],
+                color,
+                Stroke::NONE,
+            ));
         }
         Page::Graphics => {
             painter.rect_stroke(
-                egui::Rect::from_min_max(p(-9.0, -7.0), p(9.0, 4.0)),
-                2.0,
-                s,
+                egui::Rect::from_min_max(p(-8.5, -7.0), p(8.5, 4.5)),
+                egui::CornerRadius::same(2),
+                stroke,
                 egui::StrokeKind::Inside,
             );
-            painter.line_segment([p(0.0, 4.0), p(0.0, 8.0)], s);
-            painter.line_segment([p(-4.5, 8.0), p(4.5, 8.0)], s);
+            painter.line_segment([p(0.0, 4.5), p(0.0, 8.0)], stroke);
+            painter.line_segment([p(-4.5, 8.0), p(4.5, 8.0)], stroke);
         }
         Page::Shaders => {
-            painter.circle_stroke(c, 4.0, s);
-            for i in 0..8 {
-                let (sin, cos) = (i as f32 * std::f32::consts::FRAC_PI_4).sin_cos();
-                painter.line_segment([p(cos * 6.5, sin * 6.5), p(cos * 9.0, sin * 9.0)], s);
-            }
+            painter.add(egui::Shape::convex_polygon(
+                vec![
+                    p(0.0, -8.5),
+                    p(2.0, -2.0),
+                    p(8.5, 0.0),
+                    p(2.0, 2.0),
+                    p(0.0, 8.5),
+                    p(-2.0, 2.0),
+                    p(-8.5, 0.0),
+                    p(-2.0, -2.0),
+                ],
+                color,
+                Stroke::NONE,
+            ));
+            painter.add(egui::Shape::convex_polygon(
+                vec![p(7.0, -9.0), p(8.1, -6.1), p(11.0, -5.0), p(8.1, -3.9), p(7.0, -1.0), p(5.9, -3.9), p(3.0, -5.0), p(5.9, -6.1)],
+                color.gamma_multiply(0.85),
+                Stroke::NONE,
+            ));
         }
         Page::Diagnostics => {
-            for (y, len) in [(-6.0_f32, 18.0_f32), (0.0, 12.0), (6.0, 15.0)] {
-                painter.line_segment([p(-9.0, y), p(-9.0 + len, y)], s);
-            }
+            painter.circle_stroke(p(-6.0, 0.0), 2.0, stroke);
+            painter.add(egui::Shape::line(
+                vec![
+                    p(-3.0, 0.0),
+                    p(-0.5, 0.0),
+                    p(2.0, -6.0),
+                    p(5.0, 6.0),
+                    p(7.0, 0.0),
+                    p(9.0, 0.0),
+                ],
+                stroke,
+            ));
         }
         Page::Settings => {
-            for (y, knob) in [(-6.0_f32, -3.0_f32), (0.0, 4.0), (6.0, -1.0)] {
-                painter.line_segment([p(-9.0, y), p(9.0, y)], s);
-                painter.circle_filled(p(knob, y), 2.6, color);
+            for (y, knob) in [(-6.0_f32, -2.5_f32), (0.0, 3.0), (6.0, -1.5)] {
+                painter.line_segment([p(-9.0, y), p(9.0, y)], stroke);
+                painter.circle_filled(p(knob, y), 3.0, THEME.sidebar);
+                painter.circle_stroke(p(knob, y), 3.0, stroke);
             }
         }
     }
