@@ -226,47 +226,71 @@ pub(crate) fn rotated(v: Vec2, angle: f32) -> Vec2 {
 /// Draws `icon` inside a `size` square centred on `c`. `turn` (radians) spins the circular arrows.
 pub(crate) fn paint_icon(painter: &egui::Painter, icon: Icon, c: egui::Pos2, size: f32, color: Color32, turn: f32) {
     let k = size / 16.0;
-    let stroke = Stroke::new(1.7 * k, color);
+    let stroke = Stroke::new(1.8 * k, color);
     let p = |x: f32, y: f32| c + Vec2::new(x * k, y * k);
     match icon {
         Icon::Play => {
-            painter.add(egui::Shape::convex_polygon(
-                vec![p(-3.5, -6.0), p(-3.5, 6.0), p(6.0, 0.0)],
-                color,
-                Stroke::NONE,
-            ));
+            painter.line_segment([p(-3.5, -5.5), p(5.5, 0.0)], stroke);
+            painter.line_segment([p(5.5, 0.0), p(-3.5, 5.5)], stroke);
+            painter.line_segment([p(-3.5, 5.5), p(-3.5, -5.5)], stroke);
         }
         Icon::Refresh | Icon::Reset => {
             let dir = if icon == Icon::Refresh { 1.0_f32 } else { -1.0 };
             let base = if icon == Icon::Refresh { -0.87_f32 } else { -std::f32::consts::PI + 0.87 };
             let start = base + dir * turn;
             let sweep = dir * 4.9;
-            painter.add(egui::Shape::line(arc_points(c, 5.6 * k, start, sweep, 28), stroke));
-            let end = start + sweep;
-            let (sin, cos) = end.sin_cos();
-            let tip = c + Vec2::new(cos, sin) * 5.6 * k;
-            let forward = Vec2::new(-sin, cos) * dir;
-            let tip = tip + forward * 2.0 * k;
-            for side in [-0.6_f32, 0.6] {
-                painter.line_segment([tip, tip - rotated(forward, side) * 4.4 * k], stroke);
+            let steps = 24;
+            let mut previous = c + Vec2::new(start.cos(), start.sin()) * 5.6 * k;
+            for step in 1..=steps {
+                let angle = start + sweep * step as f32 / steps as f32;
+                let current = c + Vec2::new(angle.cos(), angle.sin()) * 5.6 * k;
+                painter.line_segment([previous, current], stroke);
+                previous = current;
             }
+            let end = start + sweep;
+            let tangent = Vec2::new(-end.sin(), end.cos()) * dir;
+            let tip = c + Vec2::new(end.cos(), end.sin()) * 5.6 * k + tangent * 2.0 * k;
+            let side = rotated(tangent, 0.65) * 4.0 * k;
+            let other = rotated(tangent, -0.65) * 4.0 * k;
+            painter.line_segment([tip - side, tip], stroke);
+            painter.line_segment([tip - other, tip], stroke);
         }
         Icon::Bolt => {
-            painter.add(egui::Shape::line(
-                vec![p(2.5, -8.0), p(-4.0, 1.0), p(4.0, 1.0), p(-2.5, 8.0)],
-                stroke,
-            ));
+            painter.line_segment([p(2.5, -8.0), p(-4.0, 1.0)], stroke);
+            painter.line_segment([p(-4.0, 1.0), p(4.0, 1.0)], stroke);
+            painter.line_segment([p(4.0, 1.0), p(-2.5, 8.0)], stroke);
         }
         Icon::Power => {
-            painter.add(egui::Shape::line(arc_points(c, 5.6 * k, -0.87, 4.9, 28), stroke));
+            let start = -0.87_f32;
+            let sweep = 4.9_f32;
+            let steps = 24;
+            let mut previous = p(5.6 * start.cos(), 5.6 * start.sin());
+            for step in 1..=steps {
+                let angle = start + sweep * step as f32 / steps as f32;
+                let current = p(5.6 * angle.cos(), 5.6 * angle.sin());
+                painter.line_segment([previous, current], stroke);
+                previous = current;
+            }
             painter.line_segment([p(0.0, -7.5), p(0.0, -1.0)], stroke);
         }
         Icon::Check => {
-            painter.add(egui::Shape::line(vec![p(-5.0, 0.5), p(-1.5, 4.0), p(5.5, -4.0)], stroke));
+            painter.line_segment([p(-5.0, 0.5), p(-1.5, 4.0)], stroke);
+            painter.line_segment([p(-1.5, 4.0), p(5.5, -4.0)], stroke);
         }
         Icon::User => {
             painter.circle_stroke(p(0.0, -3.5), 3.2 * k, stroke);
-            painter.add(egui::Shape::line(arc_points(p(0.0, 9.0), 6.8 * k, -2.55, 1.96, 14), stroke));
+            let center = p(0.0, 9.0);
+            let radius = 6.8 * k;
+            let start = -2.55_f32;
+            let sweep = 1.96_f32;
+            let steps = 12;
+            let mut previous = center + Vec2::new(start.cos(), start.sin()) * radius;
+            for step in 1..=steps {
+                let angle = start + sweep * step as f32 / steps as f32;
+                let current = center + Vec2::new(angle.cos(), angle.sin()) * radius;
+                painter.line_segment([previous, current], stroke);
+                previous = current;
+            }
         }
     }
 }
