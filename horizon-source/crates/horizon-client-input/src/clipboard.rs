@@ -149,12 +149,14 @@ impl Clipboard for SystemClipboard {
             return self.copied.clone().unwrap_or_default();
         };
         match system.get_text() {
-            Ok(text) => text,
-            Err(arboard::Error::ContentNotAvailable) => String::new(),
+            Ok(text) if !text.is_empty() => text,
+            Ok(_) | Err(arboard::Error::ContentNotAvailable) => {
+                self.copied.clone().unwrap_or_default()
+            }
             Err(_) => {
                 // A lost connection (a restarted compositor): reconnect next time.
                 self.system = None;
-                String::new()
+                self.copied.clone().unwrap_or_default()
             }
         }
     }
