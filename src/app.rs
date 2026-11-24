@@ -414,6 +414,38 @@ impl NebulaClient {
     }
 
     /// Copies a dropped `.zip` / `.hshader` / pack folder into `shaderpacks/` and enables it.
+    fn install_builtin_shader_pack(&mut self) {
+        if game_is_running() {
+            self.status = Some(Status { message: "Close Horizon before installing shader packs.".into(), kind: StatusKind::Error });
+            return;
+        }
+        let Some(dir) = self.shader_dir.as_deref() else {
+            self.status = Some(Status { message: "No Horizon instance is selected for shader packs.".into(), kind: StatusKind::Error });
+            return;
+        };
+        let pack_name = "Nebula Golden Hour";
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("horizon-source/crates/horizon-shader-api/packs/golden_hour");
+        let destination = dir.join(pack_name);
+        if !destination.exists() {
+            if let Err(error) = copy_dir_all(&source, &destination) {
+                self.status = Some(Status { message: format!("Could not install the bundled Golden Hour pack: {error}"), kind: StatusKind::Error });
+                return;
+            }
+        }
+        self.load_shader_state();
+        let Some(key) = self.shader_packs.iter()
+            .find(|pack| pack.file == pack_name && pack.native)
+            .map(|pack| pack.key.clone()) else {
+            self.status = Some(Status { message: "Golden Hour was copied, but Horizon did not recognize its native manifest.".into(), kind: StatusKind::Error });
+            return;
+        };
+        self.set_picked_shader(&key);
+        if self.status.as_ref().is_some_and(|status| status.kind == StatusKind::Success) {
+            self.status = Some(Status { message: "Installed and enabled the bundled Horizon-native Golden Hour shader. It applies on the next game start.".into(), kind: StatusKind::Success });
+        }
+    }
+
     fn install_shader_pack(&mut self, source: &Path) {
         if game_is_running() {
             self.status = Some(Status { message: "Close Horizon before installing shader packs.".into(), kind: StatusKind::Error });
