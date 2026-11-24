@@ -1889,14 +1889,23 @@ fn nav_item(ui: &mut egui::Ui, page: Page, label: &str, selected: bool, compact:
     let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered(), 0.12);
     let active = ui.ctx().animate_bool_with_time(response.id.with("active"), selected, 0.18);
     let painter = ui.painter();
-    painter.rect_filled(rect, 10.0, Color32::from_white_alpha((hover * 10.0) as u8));
+    painter.rect_filled(rect, 10.0, Color32::from_white_alpha((hover * 9.0) as u8));
     if active > 0.0 {
-        painter.rect_filled(rect, 10.0, Color32::from_rgba_unmultiplied(139, 91, 249, (active * 58.0) as u8));
+        painter.rect_filled(
+            rect,
+            10.0,
+            Color32::from_rgba_unmultiplied(75, 48, 119, (active * 150.0) as u8),
+        );
         painter.rect_stroke(
             rect,
             10.0,
-            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(214, 190, 255, (active * 70.0) as u8)),
+            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(190, 158, 255, (active * 90.0) as u8)),
             egui::StrokeKind::Inside,
+        );
+        painter.rect_filled(
+            egui::Rect::from_min_size(rect.left_top() + Vec2::new(0.0, 13.0), Vec2::new(2.5, 18.0)),
+            1.0,
+            PURPLE_BRIGHT.gamma_multiply(active),
         );
     }
     let color = lerp_color(MUTED, TEXT, active.max(hover * 0.7));
@@ -1922,63 +1931,79 @@ fn nav_item(ui: &mut egui::Ui, page: Page, label: &str, selected: bool, compact:
     }
 }
 
-/// Small line icons drawn with the painter so they stay crisp and need no icon font.
+/// A compact, consistent icon set drawn on a shared 18px grid.
 fn draw_nav_icon(painter: &egui::Painter, page: Page, c: egui::Pos2, color: Color32) {
-    let s = Stroke::new(1.6_f32, color);
+    let stroke = Stroke::new(1.8_f32, color);
     let p = |x: f32, y: f32| c + Vec2::new(x, y);
     match page {
         Page::Play => {
-            painter.line_segment([p(-8.0, 0.0), p(0.0, -8.0)], s);
-            painter.line_segment([p(0.0, -8.0), p(8.0, 0.0)], s);
+            painter.line_segment([p(-8.0, -1.0), p(0.0, -8.0)], stroke);
+            painter.line_segment([p(0.0, -8.0), p(8.0, -1.0)], stroke);
+            painter.line_segment([p(-6.0, -2.0), p(-6.0, 7.0)], stroke);
+            painter.line_segment([p(6.0, -2.0), p(6.0, 7.0)], stroke);
+            painter.line_segment([p(-6.0, 7.0), p(6.0, 7.0)], stroke);
             painter.rect_stroke(
-                egui::Rect::from_min_max(p(-5.5, 0.0), p(5.5, 8.0)),
-                1.5,
-                s,
+                egui::Rect::from_min_max(p(-1.8, 2.0), p(1.8, 7.0)),
+                1.0,
+                Stroke::new(1.5_f32, color),
                 egui::StrokeKind::Inside,
             );
         }
         Page::Performance => {
-            painter.line_segment([p(2.5, -9.0), p(-4.0, 1.0)], s);
-            painter.line_segment([p(-4.0, 1.0), p(4.0, 1.0)], s);
-            painter.line_segment([p(4.0, 1.0), p(-2.5, 9.0)], s);
+            painter.line_segment([p(2.5, -9.0), p(-4.5, 1.0)], stroke);
+            painter.line_segment([p(-4.5, 1.0), p(-0.5, 1.0)], stroke);
+            painter.line_segment([p(-0.5, 1.0), p(-2.5, 9.0)], stroke);
+            painter.line_segment([p(-2.5, 9.0), p(5.0, -2.0)], stroke);
+            painter.line_segment([p(5.0, -2.0), p(1.0, -2.0)], stroke);
+            painter.line_segment([p(1.0, -2.0), p(2.5, -9.0)], stroke);
         }
         Page::Graphics => {
             painter.rect_stroke(
-                egui::Rect::from_min_max(p(-9.0, -7.0), p(9.0, 4.0)),
-                2.0,
-                s,
+                egui::Rect::from_min_max(p(-8.5, -7.0), p(8.5, 4.5)),
+                egui::CornerRadius::same(2),
+                stroke,
                 egui::StrokeKind::Inside,
             );
-            painter.line_segment([p(0.0, 4.0), p(0.0, 8.0)], s);
-            painter.line_segment([p(-4.5, 8.0), p(4.5, 8.0)], s);
+            painter.line_segment([p(0.0, 4.5), p(0.0, 8.0)], stroke);
+            painter.line_segment([p(-4.5, 8.0), p(4.5, 8.0)], stroke);
         }
         Page::Customize => {
-            let frame = egui::Rect::from_min_max(p(-9.0, -7.0), p(9.0, 7.0));
-            painter.rect_stroke(frame, 2.0, s, egui::StrokeKind::Inside);
-            painter.rect_filled(egui::Rect::from_min_max(p(-6.0, -4.0), p(-1.0, -1.0)), 1.0, color);
-            painter.rect_filled(egui::Rect::from_min_max(p(2.0, 1.5), p(6.0, 4.0)), 1.0, color);
+            let frame = egui::Rect::from_min_max(p(-9.0, -7.5), p(9.0, 7.5));
+            painter.rect_stroke(frame, egui::CornerRadius::same(2), stroke, egui::StrokeKind::Inside);
+            for (x, y) in [(-5.5_f32, -4.0_f32), (1.5, -4.0), (-5.5, 1.0), (1.5, 1.0)] {
+                let tile = egui::Rect::from_min_size(p(x, y), Vec2::new(4.0, 3.0));
+                painter.rect_stroke(tile, egui::CornerRadius::same(1), Stroke::new(1.35_f32, color), egui::StrokeKind::Inside);
+            }
         }
         Page::Shaders => {
-            painter.circle_stroke(c, 4.0, s);
-            for i in 0..8 {
-                let (sin, cos) = (i as f32 * std::f32::consts::FRAC_PI_4).sin_cos();
-                painter.line_segment([p(cos * 6.5, sin * 6.5), p(cos * 9.0, sin * 9.0)], s);
-            }
+            painter.line_segment([p(0.0, -9.0), p(0.0, -3.0)], stroke);
+            painter.line_segment([p(0.0, 3.0), p(0.0, 9.0)], stroke);
+            painter.line_segment([p(-9.0, 0.0), p(-3.0, 0.0)], stroke);
+            painter.line_segment([p(3.0, 0.0), p(9.0, 0.0)], stroke);
+            painter.line_segment([p(-5.8, -5.8), p(-2.4, -2.4)], stroke);
+            painter.line_segment([p(2.4, 2.4), p(5.8, 5.8)], stroke);
+            painter.line_segment([p(5.8, -5.8), p(2.4, -2.4)], stroke);
+            painter.line_segment([p(-2.4, 2.4), p(-5.8, 5.8)], stroke);
+            painter.line_segment([p(7.0, -10.0), p(7.0, -4.5)], stroke);
+            painter.line_segment([p(4.2, -7.2), p(9.8, -7.2)], stroke);
         }
         Page::Diagnostics => {
-            for (y, len) in [(-6.0_f32, 18.0_f32), (0.0, 12.0), (6.0, 15.0)] {
-                painter.line_segment([p(-9.0, y), p(-9.0 + len, y)], s);
-            }
+            painter.line_segment([p(-9.0, 1.0), p(-5.5, 1.0)], stroke);
+            painter.line_segment([p(-5.5, 1.0), p(-2.6, -5.5)], stroke);
+            painter.line_segment([p(-2.6, -5.5), p(0.5, 6.0)], stroke);
+            painter.line_segment([p(0.5, 6.0), p(3.5, -1.5)], stroke);
+            painter.line_segment([p(3.5, -1.5), p(5.5, 1.0)], stroke);
+            painter.line_segment([p(5.5, 1.0), p(9.0, 1.0)], stroke);
         }
         Page::Settings => {
-            for (y, knob) in [(-6.0_f32, -3.0_f32), (0.0, 4.0), (6.0, -1.0)] {
-                painter.line_segment([p(-9.0, y), p(9.0, y)], s);
-                painter.circle_filled(p(knob, y), 2.6, color);
+            for (y, knob) in [(-6.0_f32, -2.5_f32), (0.0, 3.0), (6.0, -1.5)] {
+                painter.line_segment([p(-9.0, y), p(knob - 3.5, y)], stroke);
+                painter.line_segment([p(knob + 3.5, y), p(9.0, y)], stroke);
+                painter.circle_stroke(p(knob, y), 3.0, stroke);
             }
         }
     }
 }
-
 /// The primary call to action: a violet-to-coral sunset gradient with a soft glow.
 /// Returns true when it was clicked while enabled.
 fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
