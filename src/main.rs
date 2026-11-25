@@ -596,7 +596,7 @@ impl NebulaClient {
             .frame(
                 Frame::NONE
                     .fill(Color32::from_rgba_unmultiplied(10, 7, 24, 205))
-                    .inner_margin(Margin::symmetric(12, 18))
+                    .inner_margin(Margin { left: 12, right: 12, top: 24, bottom: 18 })
                     .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 22))),
             )
             .show(ctx, |ui| {
@@ -742,8 +742,26 @@ impl NebulaClient {
         } else {
             None
         };
-        if play_button(ui, blocker.is_none() && !starting, starting) {
+        const REFRESH_WIDTH: f32 = 170.0;
+        let play_width = (ui.available_width() - REFRESH_WIDTH - 12.0).max(200.0);
+        let (play, refresh) = ui
+            .horizontal(|ui| {
+                let play = play_button(ui, play_width, blocker.is_none() && !starting, starting);
+                let refresh = ui
+                    .vertical(|ui| {
+                        ui.add_space(8.0);
+                        premium_button(ui, ButtonKind::Glass, Some(Icon::Refresh), "Refresh builds", REFRESH_WIDTH).clicked()
+                    })
+                    .inner;
+                (play, refresh)
+            })
+            .inner;
+        if play {
             self.launch(ctx);
+        }
+        if refresh {
+            self.refresh();
+            self.status = Some(Status { message: "Build list refreshed.".into(), error: false });
         }
         if starting {
             ui.add_space(8.0);
@@ -754,21 +772,10 @@ impl NebulaClient {
             ui.add_space(6.0);
             ui.label(RichText::new(reason).size(12.5).color(MUTED));
         }
-        ui.add_space(8.0);
-        ui.horizontal(|ui| {
-            if premium_button(ui, ButtonKind::Ghost, Some(Icon::Refresh), "Refresh builds", 0.0).clicked() {
-                self.refresh();
-                self.status = Some(Status {
-                    message: "Build list refreshed.".into(),
-                    error: false,
-                });
-            }
-            if running {
-                ui.label(
-                    RichText::new("A Horizon client is already running.").color(PURPLE_BRIGHT),
-                );
-            }
-        });
+        if running {
+            ui.add_space(6.0);
+            ui.label(RichText::new("A Horizon client is already running.").color(PURPLE_BRIGHT));
+        }
         self.status_line(ui);
     }
 
@@ -2006,8 +2013,8 @@ fn draw_nav_icon(painter: &egui::Painter, page: Page, c: egui::Pos2, color: Colo
 }
 /// The primary call to action: a violet-to-coral sunset gradient with a soft glow.
 /// Returns true when it was clicked while enabled.
-fn play_button(ui: &mut egui::Ui, enabled: bool, starting: bool) -> bool {
-    let size = Vec2::new(ui.available_width(), 56.0);
+fn play_button(ui: &mut egui::Ui, width: f32, enabled: bool, starting: bool) -> bool {
+    let size = Vec2::new(width, 56.0);
     let (full, response) = ui.allocate_exact_size(size, egui::Sense::click());
     let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered() && enabled, 0.15);
     let pressed = enabled && response.is_pointer_button_down_on();

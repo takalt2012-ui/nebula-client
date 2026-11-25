@@ -110,7 +110,7 @@ pub(crate) fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
 pub(crate) fn glass_frame(alpha: u8) -> Frame {
     Frame::NONE
         .fill(Color32::from_rgba_unmultiplied(16, 11, 36, alpha))
-        .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(22)))
+        .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(26)))
         .corner_radius(egui::CornerRadius::same(20))
         .inner_margin(Margin::symmetric(32, 28))
         .shadow(egui::epaint::Shadow {
