@@ -6,10 +6,10 @@ use eframe::egui::{
     Shape, Stroke, UiBuilder, Vec2,
 };
 
-use crate::brand::{star_vertices, tracked_layout};
+use crate::brand::{arc_offsets, star_vertices, tracked_layout};
 use crate::theme::*;
 use crate::widgets::*;
-use crate::{draw_nav_icon, game_is_running, window_control, NebulaClient, Page, WindowAction};
+use crate::{draw_nav_icon, game_is_running, launch_progress, play_button, window_control, NebulaClient, Page, WindowAction};
 
 const DOCK_HEIGHT: f32 = 64.0;
 const PLAY_WIDTH: f32 = 300.0;
@@ -48,7 +48,10 @@ fn shadowed_text(painter: &Painter, center: Pos2, text: &str, font: &FontId, col
 /// The Nebula mark: an orbit ring that runs from violet to coral, with a four-point star inside.
 fn paint_mark(painter: &Painter, center: Pos2, size: f32) {
     let width = size * 0.07;
-    let ring = arc_points(center, size * 0.42, -0.9, 5.0, 48);
+    let ring: Vec<Pos2> = arc_offsets(size * 0.42, -0.9, 5.0, 48)
+        .into_iter()
+        .map(|(x, y)| center + Vec2::new(x, y))
+        .collect();
     let segments = ring.len().saturating_sub(1).max(1) as f32;
     for (i, pair) in ring.windows(2).enumerate() {
         let color = lerp_color(VIOLET, CORAL, i as f32 / segments);

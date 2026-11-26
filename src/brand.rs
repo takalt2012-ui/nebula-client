@@ -27,9 +27,30 @@ pub(crate) fn star_vertices(outer: f32, inner: f32) -> [(f32, f32); 8] {
     })
 }
 
+/// Points along an arc of `radius` around the origin, `steps + 1` of them, from angle `start`
+/// turning `sweep` radians.
+pub(crate) fn arc_offsets(radius: f32, start: f32, sweep: f32, steps: usize) -> Vec<(f32, f32)> {
+    let steps = steps.max(1);
+    (0..=steps)
+        .map(|i| {
+            let angle = start + sweep * i as f32 / steps as f32;
+            (radius * angle.cos(), radius * angle.sin())
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn arc_runs_from_start_to_end_on_the_radius() {
+        let points = arc_offsets(5.0, 0.0, std::f32::consts::PI, 8);
+        assert_eq!(points.len(), 9);
+        assert!((points[0].0 - 5.0).abs() < 1e-4 && points[0].1.abs() < 1e-4);
+        assert!((points[8].0 + 5.0).abs() < 1e-4);
+        assert!(points.iter().all(|(x, y)| (x.hypot(*y) - 5.0).abs() < 1e-4));
+    }
 
     #[test]
     fn tracking_goes_between_glyphs_only() {
