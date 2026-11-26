@@ -134,7 +134,7 @@ struct LauncherSettings {
     mangohud: bool,
     io_priority: bool,
     close_after_launch: bool,
-    /// Brings back the violet and coral colours from before the green theme.
+    /// Restores the original sunset and its vintage violet/coral treatment.
     legacy_look: bool,
     opengl_threading: bool,
     nvidia_threading: bool,
@@ -1557,7 +1557,7 @@ impl NebulaClient {
             ui,
             &mut legacy,
             "Legacy look",
-            "Brings back the earlier violet and coral colours. Your layout and settings are unchanged.",
+            "Restores the original sunset backdrop and its earlier violet/coral treatment.",
             true,
         ) {
             self.settings.legacy_look = legacy;
@@ -1782,7 +1782,7 @@ impl eframe::App for NebulaClient {
 
         // The original sunset is a Legacy-only backdrop. Nebula Green uses its own quiet canvas.
         egui::CentralPanel::default()
-            .frame(Frame::NONE.fill(pal().background).inner_margin(Margin::symmetric(32, 24)))
+            .frame(Frame::NONE.fill(if legacy_look() { with_alpha(pal().background, 226) } else { pal().background }).inner_margin(Margin::symmetric(32, 24)))
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                     let width = (ui.available_width() - 56.0).clamp(320.0, 900.0);
