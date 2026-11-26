@@ -735,7 +735,7 @@ impl NebulaClient {
             if self.accounts.is_empty() {
                 let can_load = self.official_launcher.is_some();
                 let mut load = false;
-                form_row(ui, "Account", "A one-time sign-in session is created only when you play.", |ui| {
+                form_row(ui, "Account", "Horizon keeps your sign-in securely and renews your session when needed.", |ui| {
                     ui.add_enabled_ui(can_load, |ui| {
                         load = premium_button(ui, ButtonKind::Glass, Some(Icon::User), "Load accounts", CONTROL_WIDTH).clicked();
                     });
@@ -747,7 +747,7 @@ impl NebulaClient {
                 labeled_combo(
                     ui,
                     "Account",
-                    "A fresh one-time game session is requested just before launch.",
+                    "Horizon refreshes the saved account and prepares a game session when you play.",
                     "account",
                     &mut self.selected_account,
                     self.accounts
@@ -1972,12 +1972,12 @@ fn nav_item(ui: &mut egui::Ui, page: Page, label: &str, selected: bool, compact:
     if active > 0.0 {
         painter.rect_filled(
             rect,
-            10.0,
+            4.0,
             with_alpha(pal().purple, (active * 150.0) as u8),
         );
         painter.rect_stroke(
             rect,
-            10.0,
+            4.0,
             Stroke::new(1.0_f32, with_alpha(pal().purple_bright, (active * 90.0) as u8)),
             egui::StrokeKind::Inside,
         );
