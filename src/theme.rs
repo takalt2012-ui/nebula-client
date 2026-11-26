@@ -104,7 +104,7 @@ pub(crate) fn themed(r: u8, g: u8, b: u8, alpha: u8) -> Color32 {
 
 /// An opaque Legacy palette colour translated like [`themed`].
 pub(crate) fn themed_rgb(r: u8, g: u8, b: u8) -> Color32 {
-    let (r, g, b) = if legacy_look() { (r, g, b) } else { green_of((r, g, b)) };
+    let (r, g, b) = if legacy_look() { (r, g, b) } else { modern_of((r, g, b)) };
     Color32::from_rgb(r, g, b)
 }
 
