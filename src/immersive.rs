@@ -106,6 +106,17 @@ fn round_button(
 impl NebulaClient {
     /// One frame of the Immersive interface.
     pub(crate) fn immersive(&mut self, ctx: &Context) {
+        if !legacy_look() {
+            if let Some(texture) = self.immersive_background.as_ref() {
+                let screen = ctx.screen_rect();
+                ctx.layer_painter(egui::LayerId::background()).image(
+                    texture.id(),
+                    screen,
+                    Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+            }
+        }
         if ctx.input(|input| input.key_pressed(egui::Key::Escape)) && self.page != Page::Play {
             self.page = Page::Play;
         }
@@ -129,6 +140,8 @@ impl NebulaClient {
         egui::CentralPanel::default().frame(Frame::NONE).show(ctx, |ui| {
             let rect = ui.max_rect();
             self.immersive_brand(ui, rect);
+            let account_uuid = self.selected_account.and_then(|index| self.accounts.get(index)).map(|account| account.uuid.as_str());
+            self.skin_viewer.show(ui, rect, account_uuid);
             self.immersive_account(ui, rect);
             self.immersive_dock(ui, ctx, rect);
         });
