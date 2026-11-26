@@ -57,3 +57,32 @@ The release-note document points to v0.2.3, but the release itself was not confi
 - [ ] Verify signed-out, signed-in, and no-skin states.
 - [ ] Run the project/build checks and inspect the launcher screenshot.
 - [ ] Summarize changed files and commits; do not silently alter the sunset asset.
+
+
+## Latest screenshot update — account control and skin preview
+
+The newest screenshot shows the account signed in (username displayed in the top-right), and a message saying `Skin preview unavailable`. The earlier `Sign in to preview your skin` state has changed, but the actual animated Minecraft player model is still not visible.
+
+### 3. Skin preview remains unavailable after sign-in
+
+Please trace the full skin-preview flow, not just authentication visibility:
+- Inspect the account/profile data returned by the sign-in helper and how its username/UUID is mapped.
+- Check skin URL/provider resolution, fetch errors, texture decoding, and the 3D renderer's initialization.
+- Make loading, no-skin, and failure states explicit and useful; do not leave the center area permanently blank.
+- If a valid skin can be resolved, render the actual 3D Minecraft model and animate its rotation. The Nebula logo spinner is not a substitute.
+- Test with the currently signed-in account as well as a signed-out account. Avoid logging credentials or tokens.
+
+### 4. Make the login/account button clearly clickable
+
+The top-right account area currently looks like the username text is being copied/selected, and it is unclear which part the user should press.
+
+Please redesign this as one cohesive, accessible account control:
+- Make the username and circular avatar part of the same obvious clickable hit target.
+- Use a pointer cursor, hover/focus/pressed feedback, and a clear menu/open state.
+- Keep the text selectable only if that is intentional; prevent accidental text-selection from making the control feel broken.
+- Ensure clicking either the username or avatar opens the same account/sign-in menu.
+- For signed-out state, use a clear action label such as **Sign in** with an appropriate icon/button treatment; avoid a floating label beside a separate avatar where the press target is ambiguous.
+- For signed-in state, show the username and avatar together and make the account menu's action labels clear.
+- Preserve the existing premium visual direction and sunset background; do not turn this into a broad redesign.
+
+Updated screenshot notes: signed-in username is visible; account avatar is a purple circle with an initial; skin preview says `Skin preview unavailable`; Play button still appears in the old purple. Treat these as observations, then inspect the code to find the causes.
