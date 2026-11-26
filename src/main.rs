@@ -595,7 +595,7 @@ impl NebulaClient {
             .exact_width(if compact { 78.0 } else { 196.0 })
             .frame(
                 Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(10, 7, 24, 205))
+                    .fill(Color32::from_rgba_unmultiplied(10, 7, 24, 100))
                     .inner_margin(Margin { left: 12, right: 12, top: 24, bottom: 18 })
                     .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 22))),
             )

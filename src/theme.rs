@@ -17,7 +17,7 @@ pub(crate) const CORAL: Color32 = Color32::from_rgb(239, 124, 99);
 pub(crate) const CORAL_TEXT: Color32 = Color32::from_rgb(255, 168, 140);
 /// Opacity of the main glass panel. Higher keeps text readable over the bright sunset glow;
 /// lower shows more of the sunset. Text colours are chosen for at least 4.5:1 at this value.
-pub(crate) const GLASS_ALPHA: u8 = 206;
+pub(crate) const GLASS_ALPHA: u8 = 140;
 
 pub(crate) fn medium() -> FontFamily {
     FontFamily::Name("Horizon Geist Medium".into())
