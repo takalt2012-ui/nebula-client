@@ -12,9 +12,9 @@ pub(crate) fn toggle_switch(ui: &mut egui::Ui, value: &mut bool) -> egui::Respon
     }
     let t = ui.ctx().animate_bool_with_time(response.id, *value, 0.14);
     let dim = if ui.is_enabled() { 1.0 } else { 0.4 };
-    let track = lerp_color(Color32::from_rgb(54, 49, 68), VIOLET, t).gamma_multiply(dim);
+    let track = lerp_color(themed_rgb(54, 49, 68), pal().violet, t).gamma_multiply(dim);
     if t > 0.0 {
-        ui.painter().rect_filled(rect.expand(2.5), 15.5, VIOLET.gamma_multiply(0.28 * t * dim));
+        ui.painter().rect_filled(rect.expand(2.5), 15.5, pal().violet.gamma_multiply(0.28 * t * dim));
     }
     ui.painter().rect_filled(rect, 13.0, track);
     ui.painter().rect_stroke(rect, 13.0, Stroke::new(1.0_f32, Color32::from_white_alpha(40)), egui::StrokeKind::Inside);
@@ -22,7 +22,7 @@ pub(crate) fn toggle_switch(ui: &mut egui::Ui, value: &mut bool) -> egui::Respon
     ui.painter().circle_filled(egui::pos2(x, rect.center().y + 1.5), 10.0, Color32::from_black_alpha(45));
     ui.painter().circle_filled(egui::pos2(x, rect.center().y), 9.5, Color32::WHITE.gamma_multiply(dim));
     if response.has_focus() {
-        ui.painter().rect_stroke(rect.expand(3.0), 16.0, Stroke::new(1.5_f32, PURPLE_BRIGHT), egui::StrokeKind::Outside);
+        ui.painter().rect_stroke(rect.expand(3.0), 16.0, Stroke::new(1.5_f32, pal().purple_bright), egui::StrokeKind::Outside);
     }
     response.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
@@ -32,15 +32,15 @@ pub(crate) fn glass_card<R>(ui: &mut egui::Ui, frame: Frame, add_contents: impl 
 }
 
 pub(crate) fn page_header(ui: &mut egui::Ui, eyebrow: &str, title: &str, subtitle: &str) {
-    ui.label(RichText::new(eyebrow).size(12.0).family(semibold()).color(CORAL_TEXT));
+    ui.label(RichText::new(eyebrow).size(12.0).family(semibold()).color(pal().coral_text));
     ui.add_space(4.0);
     ui.label(
         RichText::new(title)
             .font(FontId::new(32.0, semibold()))
-            .color(TEXT),
+            .color(pal().text),
     );
     if !subtitle.is_empty() {
-        ui.label(RichText::new(subtitle).color(MUTED));
+        ui.label(RichText::new(subtitle).color(pal().muted));
     }
     ui.add_space(10.0);
     ui.separator();
@@ -58,9 +58,9 @@ pub(crate) fn status_chip(ui: &mut egui::Ui, state: &str, color: Color32, detail
             ui.horizontal(|ui| {
                 let (dot, _) = ui.allocate_exact_size(Vec2::splat(8.0), egui::Sense::hover());
                 ui.painter().circle_filled(dot.center(), 4.0, color);
-                ui.label(RichText::new(state).size(13.0).family(medium()).color(TEXT));
-                ui.label(RichText::new("·").size(13.0).color(MUTED));
-                ui.label(RichText::new(detail).size(13.0).color(MUTED));
+                ui.label(RichText::new(state).size(13.0).family(medium()).color(pal().text));
+                ui.label(RichText::new("·").size(13.0).color(pal().muted));
+                ui.label(RichText::new(detail).size(13.0).color(pal().muted));
             });
         });
 }
@@ -341,20 +341,20 @@ pub(crate) fn premium_button(
     let painter = ui.painter();
     let text_color = match (kind, enabled) {
         (ButtonKind::Primary, true) => Color32::WHITE,
-        (ButtonKind::Glass, true) => TEXT,
-        (ButtonKind::Ghost, true) => lerp_color(MUTED, TEXT, hover),
-        (ButtonKind::Ghost, false) => MUTED.gamma_multiply(0.5),
-        (_, false) => MUTED.gamma_multiply(0.7),
+        (ButtonKind::Glass, true) => pal().text,
+        (ButtonKind::Ghost, true) => lerp_color(pal().muted, pal().text, hover),
+        (ButtonKind::Ghost, false) => pal().muted.gamma_multiply(0.5),
+        (_, false) => pal().muted.gamma_multiply(0.7),
     };
     match kind {
         // White text needs 4.5:1, so the primary fill stays a deep violet even when hovered.
         ButtonKind::Primary => {
             let fill = if !enabled {
-                Color32::from_rgb(52, 46, 76)
+                themed_rgb(52, 46, 76)
             } else if pressed {
-                Color32::from_rgb(98, 60, 205)
+                themed_rgb(98, 60, 205)
             } else {
-                lerp_color(Color32::from_rgb(112, 70, 228), PURPLE, hover)
+                lerp_color(themed_rgb(112, 70, 228), pal().purple, hover)
             };
             painter.rect_filled(rect, radius, fill);
         }
@@ -404,7 +404,7 @@ pub(crate) fn premium_button(
         painter.rect_stroke(
             full.expand(2.5),
             egui::CornerRadius::same(r + 3),
-            Stroke::new(1.5_f32, PURPLE_BRIGHT),
+            Stroke::new(1.5_f32, pal().purple_bright),
             egui::StrokeKind::Outside,
         );
     }
@@ -423,7 +423,7 @@ pub(crate) const LIST_MAX: f32 = 300.0;
 /// The frosted panel behind a dropdown's list. Nearly opaque, so rows stay readable over the sunset.
 pub(crate) fn popup_frame() -> Frame {
     Frame::NONE
-        .fill(Color32::from_rgba_unmultiplied(22, 15, 46, 244))
+        .fill(themed(22, 15, 46, 244))
         .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(52)))
         .corner_radius(egui::CornerRadius::same(14))
         .inner_margin(Margin::same(6))
@@ -458,13 +458,13 @@ pub(crate) fn dropdown_row(ui: &mut egui::Ui, text: &str, selected: bool, highli
         painter.rect_filled(
             egui::Rect::from_min_size(inner.left_top() + Vec2::new(0.0, 10.0), Vec2::new(3.0, inner.height() - 20.0)),
             2.0,
-            CORAL.gamma_multiply(hl),
+            pal().coral.gamma_multiply(hl),
         );
     }
     let color = if selected {
         Color32::WHITE
     } else {
-        lerp_color(Color32::from_rgb(214, 207, 232), Color32::WHITE, hl)
+        lerp_color(themed_rgb(214, 207, 232), Color32::WHITE, hl)
     };
     let galley = fitted_text(painter, text, 14.5, FontFamily::Proportional, color, inner.width() - 16.0 - 44.0);
     painter.galley(
@@ -478,7 +478,7 @@ pub(crate) fn dropdown_row(ui: &mut egui::Ui, text: &str, selected: bool, highli
             Icon::Check,
             egui::pos2(inner.right() - 22.0, inner.center().y),
             15.0,
-            Color32::from_rgb(255, 164, 128),
+            themed_rgb(255, 164, 128),
             0.0,
         );
     }
@@ -688,11 +688,11 @@ pub(crate) fn premium_dropdown(
     let radius = egui::CornerRadius::same(12);
     let dim = if enabled { 1.0 } else { 0.5 };
     if t > 0.0 {
-        painter.rect_filled(rect.expand(3.0), egui::CornerRadius::same(15), VIOLET.gamma_multiply(0.22 * t));
+        painter.rect_filled(rect.expand(3.0), egui::CornerRadius::same(15), pal().violet.gamma_multiply(0.22 * t));
     }
-    painter.rect_filled(rect, radius, Color32::from_rgba_unmultiplied(8, 5, 22, 124));
+    painter.rect_filled(rect, radius, themed(8, 5, 22, 124));
     painter.rect_filled(rect, radius, Color32::from_white_alpha((10.0 * hover) as u8));
-    painter.rect_filled(rect, radius, VIOLET.gamma_multiply(0.16 * t));
+    painter.rect_filled(rect, radius, pal().violet.gamma_multiply(0.16 * t));
     let shade = Color32::from_black_alpha(64);
     paint_gradient(
         painter,
@@ -712,14 +712,14 @@ pub(crate) fn premium_dropdown(
             1.0_f32,
             lerp_rgba(
                 Color32::from_white_alpha(36),
-                Color32::from_rgba_unmultiplied(198, 168, 255, 170),
+                themed(198, 168, 255, 170),
                 (hover * 0.55).max(t),
             ),
         ),
         egui::StrokeKind::Inside,
     );
     let lit = hover.max(t);
-    let text_color = lerp_color(Color32::from_rgb(226, 220, 242), Color32::WHITE, lit).gamma_multiply(dim);
+    let text_color = lerp_color(themed_rgb(226, 220, 242), Color32::WHITE, lit).gamma_multiply(dim);
     let galley = fitted_text(painter, label, 14.5, medium(), text_color, rect.width() - 16.0 - 48.0);
     painter.galley(
         egui::pos2(rect.left() + 16.0, rect.center().y - galley.size().y / 2.0),
@@ -736,13 +736,13 @@ pub(crate) fn premium_dropdown(
             chip + Vec2::new(0.0, 1.8 * flip),
             chip + Vec2::new(4.0, -1.8 * flip),
         ],
-        Stroke::new(1.7_f32, lerp_color(MUTED, TEXT, lit).gamma_multiply(dim)),
+        Stroke::new(1.7_f32, lerp_color(pal().muted, pal().text, lit).gamma_multiply(dim)),
     ));
     if response.has_focus() && !open {
         painter.rect_stroke(
             rect.expand(2.5),
             egui::CornerRadius::same(14),
-            Stroke::new(1.5_f32, PURPLE_BRIGHT),
+            Stroke::new(1.5_f32, pal().purple_bright),
             egui::StrokeKind::Outside,
         );
     }
@@ -819,20 +819,20 @@ pub(crate) fn premium_slider(
             0.14,
         );
         let fraction = (*value - low) as f32 / steps;
-        let fill_end = lerp_color(VIOLET, CORAL, fraction);
+        let fill_end = lerp_color(pal().violet, pal().coral, fraction);
         let painter = ui.painter();
         let rail = egui::Rect::from_min_max(
             egui::pos2(left, area.center().y - 3.0),
             egui::pos2(left + span, area.center().y + 3.0),
         );
-        painter.rect_filled(rail, 3.0, Color32::from_rgba_unmultiplied(8, 5, 22, 150));
+        painter.rect_filled(rail, 3.0, themed(8, 5, 22, 150));
         painter.rect_stroke(rail, 3.0, Stroke::new(1.0_f32, Color32::from_white_alpha(30)), egui::StrokeKind::Inside);
         let thumb_x = left + span * fraction;
         let filled = egui::Rect::from_min_max(rail.left_top(), egui::pos2(thumb_x, rail.bottom()));
         let (from, to) = if enabled {
-            (VIOLET, fill_end)
+            (pal().violet, fill_end)
         } else {
-            (Color32::from_rgb(78, 66, 112), Color32::from_rgb(78, 66, 112))
+            (themed_rgb(78, 66, 112), themed_rgb(78, 66, 112))
         };
         if filled.width() > 6.5 {
             paint_round_gradient(painter, filled, 3, from, to, false);
@@ -841,13 +841,13 @@ pub(crate) fn premium_slider(
         }
         let centre = egui::pos2(thumb_x, area.center().y);
         if enabled {
-            painter.circle_filled(centre, 12.0 + 4.0 * hover, VIOLET.gamma_multiply(0.18 + 0.18 * hover));
+            painter.circle_filled(centre, 12.0 + 4.0 * hover, pal().violet.gamma_multiply(0.18 + 0.18 * hover));
         }
         painter.circle_filled(centre + Vec2::new(0.0, 1.5), 10.0, Color32::from_black_alpha(70));
-        painter.circle_filled(centre, 9.5, if enabled { Color32::WHITE } else { Color32::from_rgb(150, 142, 172) });
-        painter.circle_filled(centre, 3.5, if enabled { fill_end } else { Color32::from_rgb(78, 66, 112) });
+        painter.circle_filled(centre, 9.5, if enabled { Color32::WHITE } else { themed_rgb(150, 142, 172) });
+        painter.circle_filled(centre, 3.5, if enabled { fill_end } else { themed_rgb(78, 66, 112) });
         if response.has_focus() {
-            painter.circle_stroke(centre, 14.5, Stroke::new(1.5_f32, PURPLE_BRIGHT));
+            painter.circle_stroke(centre, 14.5, Stroke::new(1.5_f32, pal().purple_bright));
         }
         if enabled && (response.hovered() || response.dragged()) {
             ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -855,14 +855,14 @@ pub(crate) fn premium_slider(
 
         let (chip, _) = ui.allocate_exact_size(Vec2::new(chip_width, 30.0), egui::Sense::hover());
         let painter = ui.painter();
-        painter.rect_filled(chip, 9.0, Color32::from_rgba_unmultiplied(8, 5, 22, 124));
+        painter.rect_filled(chip, 9.0, themed(8, 5, 22, 124));
         painter.rect_stroke(chip, 9.0, Stroke::new(1.0_f32, Color32::from_white_alpha(34)), egui::StrokeKind::Inside);
         painter.text(
             chip.center(),
             egui::Align2::CENTER_CENTER,
             format!("{}{}", *value, suffix),
             FontId::new(13.5, medium()),
-            if enabled { TEXT } else { MUTED.gamma_multiply(0.6) },
+            if enabled { pal().text } else { pal().muted.gamma_multiply(0.6) },
         );
     });
     committed
@@ -924,7 +924,7 @@ pub(crate) fn segmented_control(
 
     let painter = ui.painter();
     let track_radius = egui::CornerRadius::same(13);
-    painter.rect_filled(track, track_radius, Color32::from_rgba_unmultiplied(8, 5, 22, 124));
+    painter.rect_filled(track, track_radius, themed(8, 5, 22, 124));
     let shade = Color32::from_black_alpha(64);
     paint_gradient(
         painter,
@@ -952,14 +952,14 @@ pub(crate) fn segmented_control(
             track.left_top() + Vec2::new(TRACK_INSET + segment * slot, TRACK_INSET),
             Vec2::new(segment, TRACK_HEIGHT - 2.0 * TRACK_INSET),
         );
-        let fill = if enabled { Color32::from_rgb(112, 70, 228) } else { Color32::from_rgb(70, 58, 108) };
+        let fill = if enabled { themed_rgb(112, 70, 228) } else { themed_rgb(70, 58, 108) };
         painter.rect_filled(thumb, egui::CornerRadius::same(9), fill);
     }
     for (i, (_, label)) in options.iter().enumerate() {
         let cell = responses[i].rect;
         // The label brightens as the thumb slides under it.
         let near = (1.0 - (slot - i as f32).abs()).clamp(0.0, 1.0) * has_pick;
-        let base = lerp_color(Color32::from_rgb(190, 183, 212), TEXT, hovers[i]);
+        let base = lerp_color(themed_rgb(190, 183, 212), pal().text, hovers[i]);
         let color = lerp_color(base, Color32::WHITE, near).gamma_multiply(dim);
         let galley = fitted_text(painter, label, 13.5, medium(), color, cell.width() - 14.0);
         painter.galley(
@@ -971,7 +971,7 @@ pub(crate) fn segmented_control(
             painter.rect_stroke(
                 cell,
                 egui::CornerRadius::same(9),
-                Stroke::new(1.5_f32, PURPLE_BRIGHT),
+                Stroke::new(1.5_f32, pal().purple_bright),
                 egui::StrokeKind::Inside,
             );
         }

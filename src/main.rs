@@ -133,6 +133,8 @@ struct LauncherSettings {
     mangohud: bool,
     io_priority: bool,
     close_after_launch: bool,
+    /// Brings back the violet and coral colours from before the green theme.
+    legacy_look: bool,
     opengl_threading: bool,
     nvidia_threading: bool,
     selected_version: Option<String>,
@@ -149,6 +151,7 @@ impl Default for LauncherSettings {
             mangohud: false,
             io_priority: true,
             close_after_launch: true,
+            legacy_look: false,
             opengl_threading: false,
             nvidia_threading: false,
             selected_version: None,
@@ -209,13 +212,15 @@ struct NebulaClient {
 
 impl NebulaClient {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let settings = load_settings().unwrap_or_default();
+        set_legacy_look(settings.legacy_look);
         configure_egui(&cc.egui_ctx);
         let logo = load_horizon_logo(&cc.egui_ctx);
         let mut app = Self {
             sunset: scene::Sunset::default(),
             logo,
             page: Page::Play,
-            settings: load_settings().unwrap_or_default(),
+            settings,
             capabilities: Capabilities::detect(),
             versions: Vec::new(),
             accounts: Vec::new(),
@@ -582,9 +587,9 @@ impl NebulaClient {
             .exact_height(56.0)
             .frame(
                 Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(10, 7, 24, 112))
+                    .fill(themed(10, 7, 24, 112))
                     .inner_margin(Margin::symmetric(16, 8))
-                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 22))),
+                    .stroke(Stroke::new(1.0_f32, themed(255, 255, 255, 22))),
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
@@ -592,12 +597,12 @@ impl NebulaClient {
                         horizon_logo(ui, logo, 28.0);
                     }
                     ui.add_space(6.0);
-                    ui.label(RichText::new("NEBULA").size(14.5).family(semibold()).color(TEXT));
-                    ui.label(RichText::new("CLIENT").size(12.0).family(semibold()).color(CORAL_TEXT));
+                    ui.label(RichText::new("NEBULA").size(14.5).family(semibold()).color(pal().text));
+                    ui.label(RichText::new("CLIENT").size(12.0).family(semibold()).color(pal().coral_text));
                     let drag_width = (ui.available_width() - 330.0).max(24.0);
                     let (drag_rect, drag) = ui.allocate_exact_size(Vec2::new(drag_width, 34.0), egui::Sense::click_and_drag());
                     if drag.drag_started() { ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag); }
-                    ui.painter().text(drag_rect.center(), egui::Align2::CENTER_CENTER, "Horizon  ·  Rust Edition", FontId::new(12.0, FontFamily::Proportional), Color32::from_rgba_unmultiplied(255, 255, 255, 140));
+                    ui.painter().text(drag_rect.center(), egui::Align2::CENTER_CENTER, "Horizon  ·  Rust Edition", FontId::new(12.0, FontFamily::Proportional), themed(255, 255, 255, 140));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         window_control(ui, ctx, WindowAction::Close);
                         window_control(ui, ctx, WindowAction::Maximize);
@@ -613,10 +618,10 @@ impl NebulaClient {
         paint_gradient(
             &painter,
             egui::Rect::from_min_max(egui::pos2(rect.left(), rect.bottom() - 2.0), rect.right_bottom()),
-            VIOLET.gamma_multiply(0.85),
-            CORAL.gamma_multiply(0.85),
-            CORAL.gamma_multiply(0.85),
-            VIOLET.gamma_multiply(0.85),
+            pal().violet.gamma_multiply(0.85),
+            pal().coral.gamma_multiply(0.85),
+            pal().coral.gamma_multiply(0.85),
+            pal().violet.gamma_multiply(0.85),
         );
     }
 
@@ -627,13 +632,13 @@ impl NebulaClient {
             .exact_width(if compact { 78.0 } else { 196.0 })
             .frame(
                 Frame::NONE
-                    .fill(Color32::from_rgba_unmultiplied(10, 7, 24, 100))
+                    .fill(themed(10, 7, 24, 100))
                     .inner_margin(Margin { left: 12, right: 12, top: 24, bottom: 18 })
-                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 22))),
+                    .stroke(Stroke::new(1.0_f32, themed(255, 255, 255, 22))),
             )
             .show(ctx, |ui| {
                 if !compact {
-                    ui.label(RichText::new("MENU").size(12.0).family(semibold()).color(MUTED));
+                    ui.label(RichText::new("MENU").size(12.0).family(semibold()).color(pal().muted));
                 }
                 ui.spacing_mut().item_spacing.y = 6.0;
                 for (page, label) in Page::ALL {
@@ -645,10 +650,10 @@ impl NebulaClient {
                     ui.label(
                         RichText::new(if compact { "26.3" } else { "Horizon 26.3  ·  Rust" })
                             .size(11.0)
-                            .color(MUTED),
+                            .color(pal().muted),
                     );
                     if !compact {
-                        ui.label(RichText::new("Ctrl + 1-7 switches pages").size(12.0).color(MUTED));
+                        ui.label(RichText::new("Ctrl + 1-7 switches pages").size(12.0).color(pal().muted));
                     }
                 });
             });
@@ -659,23 +664,23 @@ impl NebulaClient {
         let starting = self.pending_game.is_some();
 
         let (state, color) = if running {
-            ("Game running", SUCCESS)
+            ("Game running", pal().success)
         } else if starting {
-            ("Starting", CORAL_TEXT)
+            ("Starting", pal().coral_text)
         } else {
-            ("Ready to play", PURPLE_BRIGHT)
+            ("Ready to play", pal().purple_bright)
         };
         let build = self
             .selected_version()
             .map_or("No build selected", |version| version.label.as_str());
         ui.horizontal(|ui| {
-            ui.label(RichText::new("NEBULA  /  HORIZON 26.3").size(12.0).family(semibold()).color(CORAL_TEXT));
+            ui.label(RichText::new("NEBULA  /  HORIZON 26.3").size(12.0).family(semibold()).color(pal().coral_text));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| status_chip(ui, state, color, build));
         });
         ui.add_space(6.0);
-        ui.label(RichText::new("Your world, at full speed.").font(FontId::new(34.0, semibold())).color(TEXT));
+        ui.label(RichText::new("Your world, at full speed.").font(FontId::new(34.0, semibold())).color(pal().text));
         ui.add_space(2.0);
-        ui.label(RichText::new("Native Minecraft client  ·  Rust edition").color(MUTED));
+        ui.label(RichText::new("Native Minecraft client  ·  Rust edition").color(pal().muted));
         ui.add_space(20.0);
 
         if self.versions.is_empty() || self.setup.is_some() {
@@ -791,11 +796,11 @@ impl NebulaClient {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         } else if let Some(reason) = blocker {
             ui.add_space(6.0);
-            ui.label(RichText::new(reason).size(12.5).color(MUTED));
+            ui.label(RichText::new(reason).size(12.5).color(pal().muted));
         }
         if running {
             ui.add_space(6.0);
-            ui.label(RichText::new("A Horizon client is already running.").color(PURPLE_BRIGHT));
+            ui.label(RichText::new("A Horizon client is already running.").color(pal().purple_bright));
         }
         self.status_line(ui);
     }
@@ -812,13 +817,13 @@ impl NebulaClient {
                 RichText::new(
                     "No Horizon instance is selected, so these settings cannot be loaded. Choose a build on Home, then refresh.",
                 )
-                .color(MUTED),
+                .color(pal().muted),
             );
             return;
         };
         let locked = game_is_running();
         if locked {
-            ui.label(RichText::new("Horizon is running. Close it to change these settings.").color(CORAL_TEXT));
+            ui.label(RichText::new("Horizon is running. Close it to change these settings.").color(pal().coral_text));
             ui.add_space(6.0);
         }
 
@@ -826,14 +831,14 @@ impl NebulaClient {
         let culling_modes = [("off", "Off"), ("sync", "Synchronous"), ("async", "Asynchronous")];
         ui.add_enabled_ui(!locked, |ui| {
             glass_card(ui, inner_card(false), |ui| {
-                ui.label(RichText::new("QUICK SETUPS").size(12.0).family(semibold()).color(CORAL_TEXT));
+                ui.label(RichText::new("QUICK SETUPS").size(12.0).family(semibold()).color(pal().coral_text));
                 ui.add_space(4.0);
                 ui.label(
                     RichText::new(
                         "Smooth, same look turns on Horizon's culling options, which skip drawing what you cannot see. Plain rendering returns them to Horizon's defaults. Neither touches leaf transparency.",
                     )
                     .size(12.5)
-                    .color(MUTED),
+                    .color(pal().muted),
                 );
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
@@ -848,7 +853,7 @@ impl NebulaClient {
             ui.add_space(12.0);
 
             glass_card(ui, inner_card(false), |ui| {
-                ui.label(RichText::new("LEAVES").size(12.0).family(semibold()).color(CORAL_TEXT));
+                ui.label(RichText::new("LEAVES").size(12.0).family(semibold()).color(pal().coral_text));
                 ui.add_space(4.0);
                 if setting_row(
                     ui,
@@ -888,7 +893,7 @@ impl NebulaClient {
             ui.add_space(12.0);
 
             glass_card(ui, inner_card(false), |ui| {
-                ui.label(RichText::new("SMOOTHNESS").size(12.0).family(semibold()).color(CORAL_TEXT));
+                ui.label(RichText::new("SMOOTHNESS").size(12.0).family(semibold()).color(pal().coral_text));
                 ui.add_space(4.0);
                 if setting_row(
                     ui,
@@ -943,7 +948,7 @@ impl NebulaClient {
             ui.add_space(12.0);
 
             glass_card(ui, inner_card(false), |ui| {
-                ui.label(RichText::new("FRAME-RATE SAFETY NET").size(12.0).family(semibold()).color(CORAL_TEXT));
+                ui.label(RichText::new("FRAME-RATE SAFETY NET").size(12.0).family(semibold()).color(pal().coral_text));
                 ui.add_space(4.0);
                 if setting_row(
                     ui,
@@ -954,7 +959,7 @@ impl NebulaClient {
                 ) {
                     changes.push((false, "dynamicResolution", gfx.dynamic_resolution.to_string()));
                 }
-                ui.label(RichText::new("Target frame rate").family(medium()).color(TEXT));
+                ui.label(RichText::new("Target frame rate").family(medium()).color(pal().text));
                 // Written once, when the drag ends or a key press settles, not on every frame of a drag.
                 if premium_slider(ui, &mut gfx.target_fps, 30..=240, " fps") {
                     changes.push((false, "targetFps", gfx.target_fps.to_string()));
@@ -1019,19 +1024,19 @@ impl NebulaClient {
         if self.hud_config_path.is_none() {
             ui.label(
                 RichText::new("The Basic HUD mod is not installed for the selected Horizon build. Install it from Horizon's Mods page, then refresh.")
-                    .color(MUTED),
+                    .color(pal().muted),
             );
             return;
         }
         let locked = game_is_running();
         if locked {
-            ui.label(RichText::new("Horizon is running. Close it to change the HUD: it rewrites this file when it exits.").color(CORAL_TEXT));
+            ui.label(RichText::new("Horizon is running. Close it to change the HUD: it rewrites this file when it exits.").color(pal().coral_text));
             ui.add_space(6.0);
         }
         let mut commit = false;
         ui.add_enabled_ui(!locked, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new("PRESET").size(12.0).family(semibold()).color(CORAL_TEXT));
+                ui.label(RichText::new("PRESET").size(12.0).family(semibold()).color(pal().coral_text));
                 for preset in Preset::ALL {
                     let response = premium_button(ui, ButtonKind::Glass, None, preset.label(), 96.0).on_hover_text(preset.hint());
                     if response.clicked() {
@@ -1062,13 +1067,13 @@ impl NebulaClient {
         paint_gradient(
             &painter,
             rect,
-            Color32::from_rgb(22, 26, 56),
-            Color32::from_rgb(22, 26, 56),
-            Color32::from_rgb(58, 46, 70),
-            Color32::from_rgb(58, 46, 70),
+            themed_rgb(22, 26, 56),
+            themed_rgb(22, 26, 56),
+            themed_rgb(58, 46, 70),
+            themed_rgb(58, 46, 70),
         );
         let ground = egui::Rect::from_min_max(egui::pos2(rect.left(), rect.top() + rect.height() * 0.66), rect.max);
-        painter.rect_filled(ground, 0.0, Color32::from_rgb(34, 42, 30));
+        painter.rect_filled(ground, 0.0, themed_rgb(34, 42, 30));
         let slot = 20.0 * px;
         let hotbar_left = rect.center().x - slot * 4.5;
         for i in 0..9 {
@@ -1114,7 +1119,7 @@ impl NebulaClient {
             let alpha = (f32::from(style.opacity) * 2.55) as u8;
             painter.rect_filled(area, 2.0, Color32::from_rgba_unmultiplied(br, bg, bb, alpha));
             if self.hud_selected == widget {
-                painter.rect_stroke(area.expand(1.0), 3.0, Stroke::new(1.5_f32, PURPLE_BRIGHT), egui::StrokeKind::Outside);
+                painter.rect_stroke(area.expand(1.0), 3.0, Stroke::new(1.5_f32, pal().purple_bright), egui::StrokeKind::Outside);
             }
             let [ar, ag, ab] = style.accent;
             let ink = style.text.map_or(Color32::WHITE, |[r, g, b]| Color32::from_rgb(r, g, b));
@@ -1134,7 +1139,7 @@ impl NebulaClient {
     fn hud_widget_list(&mut self, ui: &mut egui::Ui) -> bool {
         let mut commit = false;
         glass_card(ui, inner_card(false), |ui| {
-            ui.label(RichText::new("WIDGETS").size(12.0).family(semibold()).color(CORAL_TEXT));
+            ui.label(RichText::new("WIDGETS").size(12.0).family(semibold()).color(pal().coral_text));
             ui.add_space(6.0);
             egui::Grid::new("hud_widget_list").num_columns(4).spacing([18.0, 8.0]).show(ui, |ui| {
                 for (n, widget) in Widget::ALL.into_iter().enumerate() {
@@ -1143,7 +1148,7 @@ impl NebulaClient {
                         self.hud.style_mut(widget).enabled = on;
                         commit = true;
                     }
-                    let label = RichText::new(widget.label()).family(medium()).color(if self.hud_selected == widget { PURPLE_BRIGHT } else { TEXT });
+                    let label = RichText::new(widget.label()).family(medium()).color(if self.hud_selected == widget { pal().purple_bright } else { pal().text });
                     if ui.add(egui::Label::new(label).sense(egui::Sense::click())).clicked() {
                         self.hud_selected = widget;
                     }
@@ -1160,34 +1165,34 @@ impl NebulaClient {
         let widget = self.hud_selected;
         let mut commit = false;
         glass_card(ui, inner_card(false), |ui| {
-            ui.label(RichText::new(format!("STYLE  ·  {}", widget.label().to_uppercase())).size(12.0).family(semibold()).color(CORAL_TEXT));
+            ui.label(RichText::new(format!("STYLE  ·  {}", widget.label().to_uppercase())).size(12.0).family(semibold()).color(pal().coral_text));
             ui.add_space(8.0);
             let style = self.hud.style_mut(widget);
 
-            ui.label(RichText::new("Size").family(medium()).color(TEXT));
+            ui.label(RichText::new("Size").family(medium()).color(pal().text));
             let mut scale = (style.scale * 100.0).round() as u32;
             commit |= premium_slider(ui, &mut scale, 50..=300, "%");
             style.scale = scale as f32 / 100.0;
 
-            ui.label(RichText::new("Background opacity").family(medium()).color(TEXT));
+            ui.label(RichText::new("Background opacity").family(medium()).color(pal().text));
             let mut opacity = u32::from(style.opacity);
             commit |= premium_slider(ui, &mut opacity, 0..=100, "%");
             style.opacity = opacity.min(100) as u8;
 
-            ui.label(RichText::new("Padding").family(medium()).color(TEXT));
+            ui.label(RichText::new("Padding").family(medium()).color(pal().text));
             let mut padding = style.padding.round() as u32;
             commit |= premium_slider(ui, &mut padding, 0..=12, " px");
             style.padding = padding as f32;
 
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                ui.label(RichText::new("Background").color(MUTED));
+                ui.label(RichText::new("Background").color(pal().muted));
                 commit |= egui::color_picker::color_edit_button_srgb(ui, &mut style.background).changed();
                 ui.add_space(12.0);
-                ui.label(RichText::new("Label").color(MUTED));
+                ui.label(RichText::new("Label").color(pal().muted));
                 commit |= egui::color_picker::color_edit_button_srgb(ui, &mut style.accent).changed();
                 ui.add_space(12.0);
-                ui.label(RichText::new("Text").color(MUTED));
+                ui.label(RichText::new("Text").color(pal().muted));
                 let mut rgb = style.text.unwrap_or([255, 255, 255]);
                 if egui::color_picker::color_edit_button_srgb(ui, &mut rgb).changed() {
                     style.text = Some(rgb);
@@ -1201,10 +1206,10 @@ impl NebulaClient {
                     style.text = if status_colours { None } else { Some([255, 255, 255]) };
                     commit = true;
                 }
-                ui.label(RichText::new("Status colours").family(medium()).color(TEXT));
+                ui.label(RichText::new("Status colours").family(medium()).color(pal().text));
                 ui.add_space(16.0);
                 commit |= toggle_switch(ui, &mut style.shadow).changed();
-                ui.label(RichText::new("Text shadow").family(medium()).color(TEXT));
+                ui.label(RichText::new("Text shadow").family(medium()).color(pal().text));
             });
             ui.add_space(12.0);
             if premium_button(ui, ButtonKind::Ghost, Some(Icon::Reset), "Reset this widget", 0.0).clicked() {
@@ -1268,14 +1273,14 @@ impl NebulaClient {
         ui.label(
             RichText::new("Advanced renderer switches")
                 .family(medium())
-                .color(TEXT),
+                .color(pal().text),
         );
         ui.label(
             RichText::new(
                 "Leave these off unless you know the active renderer benefits from them.",
             )
             .size(12.5)
-            .color(MUTED),
+            .color(pal().muted),
         );
         let gl_changed = setting_row(
             ui,
@@ -1323,7 +1328,7 @@ impl NebulaClient {
                 RichText::new(
                     "No Horizon instance is selected, so shader packs cannot be loaded. Pick a build on Home, then refresh.",
                 )
-                .color(MUTED),
+                .color(pal().muted),
             );
             self.status_line(ui);
             return;
@@ -1337,18 +1342,18 @@ impl NebulaClient {
         glass_card(ui, inner_card(false), |ui| {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
-                    ui.label(RichText::new("ACTIVE SHADER").size(11.5).family(semibold()).color(PURPLE_BRIGHT));
+                    ui.label(RichText::new("ACTIVE SHADER").size(11.5).family(semibold()).color(pal().purple_bright));
                     if picked.is_empty() {
-                        ui.label(RichText::new("Vanilla rendering").family(medium()).color(TEXT));
-                        ui.label(RichText::new("No shader pack is currently selected").size(12.0).color(MUTED));
+                        ui.label(RichText::new("Vanilla rendering").family(medium()).color(pal().text));
+                        ui.label(RichText::new("No shader pack is currently selected").size(12.0).color(pal().muted));
                     } else {
                         let title = packs
                             .iter()
                             .find(|pack| pack.key == picked || pack.file == picked)
                             .map(|pack| pack.title.as_str())
                             .unwrap_or(picked);
-                        ui.label(RichText::new(title).family(medium()).color(SUCCESS));
-                        ui.label(RichText::new(picked).size(12.0).monospace().color(MUTED));
+                        ui.label(RichText::new(title).family(medium()).color(pal().success));
+                        ui.label(RichText::new(picked).size(12.0).monospace().color(pal().muted));
                     }
                 });
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -1373,25 +1378,25 @@ impl NebulaClient {
                 ui.label(
                     RichText::new("Drop a shader pack to install")
                         .family(medium())
-                        .color(TEXT),
+                        .color(pal().text),
                 );
                 ui.label(
                     RichText::new(".zip for shaders/ packs  ·  .hshader for Horizon native packs")
                         .size(12.0)
-                        .color(MUTED),
+                        .color(pal().muted),
                 );
             });
         });
 
         ui.add_space(16.0);
-        ui.label(RichText::new("INSTALLED PACKS").size(11.5).family(semibold()).color(PURPLE_BRIGHT));
+        ui.label(RichText::new("INSTALLED PACKS").size(11.5).family(semibold()).color(pal().purple_bright));
         ui.add_space(7.0);
 
         let mut enable_request: Option<String> = None;
         if packs.is_empty() {
             ui.label(
                 RichText::new("No shader packs found in this instance's shaderpacks folder.")
-                    .color(MUTED),
+                    .color(pal().muted),
             );
         } else {
             glass_card(ui, inner_card(false), |ui| {
@@ -1400,13 +1405,13 @@ impl NebulaClient {
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
                             ui.horizontal(|ui| {
-                                ui.label(RichText::new(&pack.title).family(medium()).color(TEXT));
+                                ui.label(RichText::new(&pack.title).family(medium()).color(pal().text));
                                 if pack.file == "Nebula Golden Hour" {
                                     ui.label(
                                         RichText::new("BUNDLED")
                                             .size(10.0)
                                             .family(semibold())
-                                            .color(PURPLE_BRIGHT),
+                                            .color(pal().purple_bright),
                                     );
                                 }
                             });
@@ -1414,20 +1419,20 @@ impl NebulaClient {
                                 ui.label(
                                     RichText::new(if pack.native { "Horizon native" } else { "shaders/ format" })
                                         .size(12.0)
-                                        .color(MUTED),
+                                        .color(pal().muted),
                                 );
                                 ui.label(
                                     RichText::new(pack.file.as_str())
                                         .size(12.0)
-                                        .color(MUTED),
+                                        .color(pal().muted),
                                 );
                             });
                         });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             if active {
                                 Frame::NONE
-                                    .fill(Color32::from_rgba_unmultiplied(75, 180, 124, 24))
-                                    .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(119, 220, 160, 76)))
+                                    .fill(themed(75, 180, 124, 24))
+                                    .stroke(Stroke::new(1.0_f32, themed(119, 220, 160, 76)))
                                     .corner_radius(egui::CornerRadius::same(8))
                                     .inner_margin(Margin::symmetric(10, 5))
                                     .show(ui, |ui| {
@@ -1435,7 +1440,7 @@ impl NebulaClient {
                                             RichText::new("ACTIVE")
                                                 .size(10.5)
                                                 .family(semibold())
-                                                .color(SUCCESS),
+                                                .color(pal().success),
                                         );
                                     });
                             } else if ui
@@ -1476,7 +1481,7 @@ impl NebulaClient {
             if running {
                 ui.label(
                     RichText::new("A Horizon client is running; close it to change shader packs.")
-                        .color(PURPLE_BRIGHT),
+                        .color(pal().purple_bright),
                 );
             }
         });
@@ -1489,15 +1494,15 @@ impl NebulaClient {
         diagnostic_row(ui, "Nebula cache", &cache_dir());
         diagnostic_row(ui, "Nebula settings", &settings_path());
         ui.add_space(18.0);
-        ui.label(RichText::new(format!("Prepared builds: {}", self.versions.len())).color(TEXT));
-        ui.label(RichText::new(format!("Loaded accounts: {}", self.accounts.len())).color(TEXT));
+        ui.label(RichText::new(format!("Prepared builds: {}", self.versions.len())).color(pal().text));
+        ui.label(RichText::new(format!("Loaded accounts: {}", self.accounts.len())).color(pal().text));
         ui.label(
             RichText::new(match &self.official_launcher {
                 Some(path) => format!("Sign-in helper: {}", path.display()),
                 None => "Sign-in helper: not found".into(),
             })
             .size(12.5)
-            .color(MUTED),
+            .color(pal().muted),
         );
         ui.label(
             RichText::new(format!(
@@ -1506,13 +1511,13 @@ impl NebulaClient {
                 yes_no(self.capabilities.mangohud),
                 yes_no(self.capabilities.ionice)
             ))
-            .color(MUTED),
+            .color(pal().muted),
         );
         ui.add_space(18.0);
         ui.label(
             RichText::new("Horizon's sign-in helper creates a one-time session at launch. Nebula never reads or stores your credentials.")
                 .size(12.5)
-                .color(MUTED),
+                .color(pal().muted),
         );
         self.status_line(ui);
     }
@@ -1534,6 +1539,19 @@ impl NebulaClient {
             self.persist_selection();
         }
         ui.add_space(8.0);
+        let mut legacy = self.settings.legacy_look;
+        if setting_row(
+            ui,
+            &mut legacy,
+            "Legacy look",
+            "Brings back the earlier violet and coral colours. Your layout and settings are unchanged.",
+            true,
+        ) {
+            self.settings.legacy_look = legacy;
+            set_legacy_look(legacy);
+            configure_egui(ui.ctx());
+            self.persist_selection();
+        }
         let picked = choice_row(
             ui,
             "Interface",
@@ -1552,7 +1570,7 @@ impl NebulaClient {
     fn status_line(&self, ui: &mut egui::Ui) {
         if let Some(status) = &self.status {
             ui.add_space(14.0);
-            let tint = if status.error { DANGER } else { SUCCESS };
+            let tint = if status.error { pal().danger } else { pal().success };
             Frame::NONE
                 .fill(tint.gamma_multiply(0.13))
                 .stroke(Stroke::new(1.0_f32, tint.gamma_multiply(0.45)))
@@ -1564,7 +1582,7 @@ impl NebulaClient {
                     } else {
                         status.message.clone()
                     };
-                    ui.label(RichText::new(text).color(TEXT));
+                    ui.label(RichText::new(text).color(pal().text));
                 });
         }
     }
@@ -1610,25 +1628,25 @@ impl NebulaClient {
         let mut cancel = false;
         glass_card(ui, inner_card(true), |ui| {
             if let Some(run) = &self.setup {
-                ui.label(RichText::new(run.step().title()).family(medium()).color(TEXT));
+                ui.label(RichText::new(run.step().title()).family(medium()).color(pal().text));
                 ui.add_space(6.0);
                 let time = ui.input(|input| input.time) as f32;
                 launch_progress(ui, time);
                 ui.add_space(8.0);
                 run.with_tail(4, |lines| {
                     for line in lines {
-                        ui.label(RichText::new(line).size(12.0).monospace().color(MUTED));
+                        ui.label(RichText::new(line).size(12.0).monospace().color(pal().muted));
                     }
                 });
                 ui.add_space(8.0);
                 cancel = premium_button(ui, ButtonKind::Ghost, Some(Icon::Power), "Cancel", 0.0).clicked();
                 return;
             }
-            ui.label(RichText::new("Set up Horizon").family(medium()).color(TEXT));
+            ui.label(RichText::new("Set up Horizon").family(medium()).color(pal().text));
             ui.label(
                 RichText::new("Nebula installs the game and prepares its files from your own Minecraft copy.")
                     .size(12.5)
-                    .color(MUTED),
+                    .color(pal().muted),
             );
             ui.add_space(10.0);
             ui.horizontal(|ui| {
@@ -1814,8 +1832,8 @@ fn window_control(ui: &mut egui::Ui, ctx: &Context, action: WindowAction) {
         WindowAction::Close => "Close",
     });
     let fill = match (action, response.hovered()) {
-        (WindowAction::Close, true) => Color32::from_rgb(212, 70, 103),
-        (_, true) => Color32::from_rgba_unmultiplied(255, 255, 255, 38),
+        (WindowAction::Close, true) => themed_rgb(212, 70, 103),
+        (_, true) => themed(255, 255, 255, 38),
         _ => Color32::TRANSPARENT,
     };
     ui.painter().rect_filled(rect, 7.0, fill);
@@ -1853,8 +1871,8 @@ fn form_row(ui: &mut egui::Ui, title: &str, description: &str, add_control: impl
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = 3.0;
-            ui.label(RichText::new(title).family(medium()).color(TEXT));
-            ui.label(RichText::new(description).size(12.5).color(MUTED));
+            ui.label(RichText::new(title).family(medium()).color(pal().text));
+            ui.label(RichText::new(description).size(12.5).color(pal().muted));
         });
         ui.with_layout(Layout::right_to_left(Align::Center), add_control);
     });
@@ -1888,8 +1906,8 @@ fn setting_row(ui: &mut egui::Ui, value: &mut bool, title: &str, description: &s
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = 3.0;
-            ui.label(RichText::new(title).family(medium()).color(if enabled { TEXT } else { MUTED }));
-            ui.label(RichText::new(description).size(12.5).color(MUTED));
+            ui.label(RichText::new(title).family(medium()).color(if enabled { pal().text } else { pal().muted }));
+            ui.label(RichText::new(description).size(12.5).color(pal().muted));
         });
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             changed = ui.add_enabled_ui(enabled, |ui| toggle_switch(ui, value)).inner.changed();
@@ -1900,12 +1918,12 @@ fn setting_row(ui: &mut egui::Ui, value: &mut bool, title: &str, description: &s
 }
 
 fn diagnostic_row(ui: &mut egui::Ui, label: &str, value: &Path) {
-    ui.label(RichText::new(label).family(medium()).color(TEXT));
+    ui.label(RichText::new(label).family(medium()).color(pal().text));
     ui.label(
         RichText::new(value.display().to_string())
             .monospace()
             .size(12.5)
-            .color(MUTED),
+            .color(pal().muted),
     );
     ui.add_space(8.0);
 }
@@ -1928,7 +1946,7 @@ fn account_chip(ui: &mut egui::Ui, account: Option<&str>) {
                 let (avatar, _) = ui.allocate_exact_size(Vec2::splat(20.0), egui::Sense::hover());
                 match account.and_then(|name| name.chars().next()) {
                     Some(initial) => {
-                        ui.painter().circle_filled(avatar.center(), 10.0, VIOLET);
+                        ui.painter().circle_filled(avatar.center(), 10.0, pal().violet);
                         ui.painter().text(
                             avatar.center(),
                             egui::Align2::CENTER_CENTER,
@@ -1939,10 +1957,10 @@ fn account_chip(ui: &mut egui::Ui, account: Option<&str>) {
                     }
                     None => {
                         ui.painter().circle_filled(avatar.center(), 10.0, Color32::from_white_alpha(20));
-                        paint_icon(ui.painter(), Icon::User, avatar.center(), 12.0, MUTED, 0.0);
+                        paint_icon(ui.painter(), Icon::User, avatar.center(), 12.0, pal().muted, 0.0);
                     }
                 }
-                ui.label(RichText::new(account.unwrap_or("Not signed in")).size(13.0).color(if account.is_some() { TEXT } else { MUTED }));
+                ui.label(RichText::new(account.unwrap_or("Not signed in")).size(13.0).color(if account.is_some() { pal().text } else { pal().muted }));
             });
         });
 }
@@ -1969,10 +1987,10 @@ fn nav_item(ui: &mut egui::Ui, page: Page, label: &str, selected: bool, compact:
         painter.rect_filled(
             egui::Rect::from_min_size(rect.left_top() + Vec2::new(0.0, 13.0), Vec2::new(2.5, 18.0)),
             1.0,
-            PURPLE_BRIGHT.gamma_multiply(active),
+            pal().purple_bright.gamma_multiply(active),
         );
     }
-    let color = lerp_color(MUTED, TEXT, active.max(hover * 0.7));
+    let color = lerp_color(pal().muted, pal().text, active.max(hover * 0.7));
     let icon_x = if compact { rect.center().x } else { rect.left() + 26.0 };
     draw_nav_icon(painter, page, egui::pos2(icon_x, rect.center().y), color);
     if !compact {
@@ -1985,7 +2003,7 @@ fn nav_item(ui: &mut egui::Ui, page: Page, label: &str, selected: bool, compact:
         );
     }
     if response.has_focus() {
-        painter.rect_stroke(rect, 12.0, Stroke::new(1.5_f32, PURPLE_BRIGHT), egui::StrokeKind::Inside);
+        painter.rect_stroke(rect, 12.0, Stroke::new(1.5_f32, pal().purple_bright), egui::StrokeKind::Inside);
     }
     let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
     if compact {
@@ -2079,11 +2097,11 @@ fn play_button(ui: &mut egui::Ui, width: f32, enabled: bool, starting: bool) -> 
     let radius = egui::CornerRadius::same(14);
     // White text needs 4.5:1, so the fill stays a deep violet even when hovered.
     let fill = if !enabled {
-        Color32::from_rgb(52, 46, 76)
+        themed_rgb(52, 46, 76)
     } else if pressed {
-        Color32::from_rgb(98, 60, 205)
+        themed_rgb(98, 60, 205)
     } else {
-        lerp_color(Color32::from_rgb(112, 70, 228), PURPLE, hover)
+        lerp_color(themed_rgb(112, 70, 228), pal().purple, hover)
     };
     let painter = ui.painter();
     if enabled {
@@ -2093,14 +2111,14 @@ fn play_button(ui: &mut egui::Ui, width: f32, enabled: bool, starting: bool) -> 
                 offset: [0, 8],
                 blur: 24,
                 spread: 0,
-                color: VIOLET.gamma_multiply(0.30 + 0.20 * hover),
+                color: pal().violet.gamma_multiply(0.30 + 0.20 * hover),
             }
             .as_shape(rect, radius),
         );
     }
     painter.rect_filled(rect, radius, fill);
     let font = FontId::new(18.0, semibold());
-    let color = if enabled { Color32::WHITE } else { MUTED.gamma_multiply(0.7) };
+    let color = if enabled { Color32::WHITE } else { pal().muted.gamma_multiply(0.7) };
     if starting {
         painter.text(rect.center(), egui::Align2::CENTER_CENTER, "Starting Horizon…", font, color);
     } else {
@@ -2139,7 +2157,7 @@ fn launch_progress(ui: &mut egui::Ui, time: f32) {
         painter.rect_filled(
             egui::Rect::from_min_max(egui::pos2(left, rect.top()), egui::pos2(right, rect.bottom())),
             3.0,
-            lerp_color(VIOLET, CORAL, phase),
+            lerp_color(pal().violet, pal().coral, phase),
         );
     }
 }
@@ -2297,8 +2315,8 @@ fn choice_row(
 ) -> Option<String> {
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 3.0;
-        ui.label(RichText::new(title).family(medium()).color(TEXT));
-        ui.label(RichText::new(description).size(12.5).color(MUTED));
+        ui.label(RichText::new(title).family(medium()).color(pal().text));
+        ui.label(RichText::new(description).size(12.5).color(pal().muted));
     });
     ui.add_space(2.0);
     let picked = segmented_control(ui, egui::Id::new(("nebula_choice", title)), options, current);
@@ -3163,20 +3181,24 @@ mod gfx_tests {
         // Brightest sky behind the panel: the lowest sky band lit by the sun's glow.
         let sky = [209.0_f32, 95.0, 108.0];
         let k = GLASS_ALPHA as f32 / 255.0;
-        let glass = [16.0_f32, 11.0, 36.0];
-        // The inner card adds a faint white overlay on top of the glass.
-        let card = |c: f32| 0.035 * 255.0 + (1.0 - 0.035) * c;
-        let bg: [u8; 3] = std::array::from_fn(|i| card(glass[i] * k + sky[i] * (1.0 - k)).round() as u8);
-        for (name, color) in [
-            ("TEXT", TEXT),
-            ("MUTED", MUTED),
-            ("CORAL_TEXT", CORAL_TEXT),
-            ("PURPLE_BRIGHT", PURPLE_BRIGHT),
-            ("DANGER", DANGER),
-            ("SUCCESS", SUCCESS),
+        for (theme, palette, glass) in [
+            ("legacy", LEGACY, [16.0_f32, 11.0, 36.0]),
+            ("green", GREEN, [11.0_f32, 43.0, 38.0]),
         ] {
-            let ratio = contrast([color.r(), color.g(), color.b()], bg);
-            assert!(ratio >= 4.5, "{name} only {ratio:.2}:1");
+            // The inner card adds a faint white overlay on top of the glass.
+            let card = |c: f32| 0.035 * 255.0 + (1.0 - 0.035) * c;
+            let bg: [u8; 3] = std::array::from_fn(|i| card(glass[i] * k + sky[i] * (1.0 - k)).round() as u8);
+            for (name, color) in [
+                ("text", palette.text),
+                ("muted", palette.muted),
+                ("coral_text", palette.coral_text),
+                ("purple_bright", palette.purple_bright),
+                ("danger", palette.danger),
+                ("success", palette.success),
+            ] {
+                let ratio = contrast([color.r(), color.g(), color.b()], bg);
+                assert!(ratio >= 4.5, "{theme} {name} only {ratio:.2}:1");
+            }
         }
     }
 }

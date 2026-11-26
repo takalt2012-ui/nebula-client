@@ -54,12 +54,12 @@ fn paint_mark(painter: &Painter, center: Pos2, size: f32) {
         .collect();
     let segments = ring.len().saturating_sub(1).max(1) as f32;
     for (i, pair) in ring.windows(2).enumerate() {
-        let color = lerp_color(VIOLET, CORAL, i as f32 / segments);
+        let color = lerp_color(pal().violet, pal().coral, i as f32 / segments);
         painter.line_segment([pair[0], pair[1]], Stroke::new(width, color));
     }
     if let (Some(first), Some(last)) = (ring.first(), ring.last()) {
-        painter.circle_filled(*first, width / 2.0, VIOLET);
-        painter.circle_filled(*last, width / 2.0, CORAL);
+        painter.circle_filled(*first, width / 2.0, pal().violet);
+        painter.circle_filled(*last, width / 2.0, pal().coral);
     }
     let tips = star_vertices(size * 0.30, size * 0.07);
     for i in 0..tips.len() {
@@ -84,7 +84,7 @@ fn round_button(
     let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered(), 0.12);
     let painter = ui.painter();
     let fill = if active {
-        Color32::from_rgba_unmultiplied(139, 91, 249, 190)
+        themed(139, 91, 249, 190)
     } else {
         Color32::from_rgba_unmultiplied(14, 10, 30, (150.0 + 50.0 * hover) as u8)
     };
@@ -96,9 +96,9 @@ fn round_button(
         Stroke::new(1.0_f32, Color32::from_white_alpha((34.0 + 60.0 * hover) as u8)),
     );
     if response.has_focus() {
-        painter.circle_stroke(rect.center(), radius + 2.0, Stroke::new(1.5_f32, PURPLE_BRIGHT));
+        painter.circle_stroke(rect.center(), radius + 2.0, Stroke::new(1.5_f32, pal().purple_bright));
     }
-    let ink = lerp_color(MUTED, TEXT, if active { 1.0 } else { hover });
+    let ink = lerp_color(pal().muted, pal().text, if active { 1.0 } else { hover });
     icon(painter, rect.center(), ink);
     response.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(tip)
 }
@@ -141,9 +141,9 @@ impl NebulaClient {
         let top = rect.top() + (rect.height() * 0.17).max(36.0);
         paint_mark(painter, Pos2::new(x, top), 64.0);
         let name = FontId::new(46.0, semibold());
-        shadowed_text(painter, Pos2::new(x, top + 78.0), "NEBULA", &name, TEXT, 14.0);
+        shadowed_text(painter, Pos2::new(x, top + 78.0), "NEBULA", &name, pal().text, 14.0);
         let sub = FontId::new(13.0, semibold());
-        shadowed_text(painter, Pos2::new(x, top + 118.0), "CLIENT", &sub, CORAL_TEXT, 11.0);
+        shadowed_text(painter, Pos2::new(x, top + 118.0), "CLIENT", &sub, pal().coral_text, 11.0);
     }
 
     fn immersive_account(&mut self, ui: &mut egui::Ui, rect: Rect) {
@@ -163,7 +163,7 @@ impl NebulaClient {
                 painter.circle_filled(
                     avatar.center(),
                     28.0,
-                    if initial.is_some() { VIOLET } else { Color32::from_rgba_unmultiplied(14, 10, 30, 170) },
+                    if initial.is_some() { pal().violet } else { themed(14, 10, 30, 170) },
                 );
                 match initial {
                     Some(letter) => {
@@ -175,7 +175,7 @@ impl NebulaClient {
                             Color32::WHITE,
                         );
                     }
-                    None => paint_icon(painter, Icon::User, avatar.center(), 22.0, MUTED, 0.0),
+                    None => paint_icon(painter, Icon::User, avatar.center(), 22.0, pal().muted, 0.0),
                 }
                 painter.circle_stroke(avatar.center(), 27.0, Stroke::new(2.0_f32, Color32::from_white_alpha(170)));
                 if can_switch {
@@ -184,10 +184,10 @@ impl NebulaClient {
                 ui.add_space(6.0);
                 match name {
                     Some(text) => {
-                        ui.label(RichText::new(text).size(16.0).family(semibold()).color(TEXT));
+                        ui.label(RichText::new(text).size(16.0).family(semibold()).color(pal().text));
                     }
                     None => {
-                        let label = RichText::new("Sign in").size(16.0).family(semibold()).color(TEXT);
+                        let label = RichText::new("Sign in").size(16.0).family(semibold()).color(pal().text);
                         sign_in = ui.add(egui::Label::new(label).sense(Sense::click())).clicked();
                     }
                 }
@@ -241,11 +241,11 @@ impl NebulaClient {
         let left = rect.left() + EDGE;
         let reach = (play.left() - 28.0 - left).max(120.0);
         let (state, color) = if running {
-            ("RUNNING", SUCCESS)
+            ("RUNNING", pal().success)
         } else if starting {
-            ("STARTING", CORAL_TEXT)
+            ("STARTING", pal().coral_text)
         } else {
-            ("READY", PURPLE_BRIGHT)
+            ("READY", pal().purple_bright)
         };
         let before = self.selected_version;
         ui.scope_builder(
@@ -255,9 +255,9 @@ impl NebulaClient {
                 ui.horizontal(|ui| {
                     let (dot, _) = ui.allocate_exact_size(Vec2::splat(8.0), Sense::hover());
                     ui.painter().circle_filled(dot.center(), 4.0, color);
-                    ui.label(RichText::new(state).size(12.0).family(semibold()).color(TEXT));
+                    ui.label(RichText::new(state).size(12.0).family(semibold()).color(pal().text));
                     if let Some(reason) = blocker {
-                        ui.label(RichText::new(reason).size(12.0).color(MUTED));
+                        ui.label(RichText::new(reason).size(12.0).color(pal().muted));
                     }
                 });
                 if !self.versions.is_empty() {
