@@ -1803,12 +1803,13 @@ fn main() -> eframe::Result<()> {
         return Ok(());
     }
 
+    let transparent_window = load_settings().map(|settings| settings.transparent_window).unwrap_or(false);
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1160.0, 780.0])
             .with_min_inner_size([960.0, 640.0])
             .with_decorations(false)
-            .with_transparent(false)
+            .with_transparent(transparent_window)
             .with_drag_and_drop(true)
             .with_title("Nebula Client"),
         renderer: eframe::Renderer::Glow,
