@@ -216,13 +216,13 @@ pub(crate) fn inner_card(highlight: bool) -> Frame {
     Frame::NONE
         .fill(with_alpha(
             if highlight { pal().surface_raised } else { pal().surface },
-            if highlight { 246 } else { 232 },
+            if highlight { 255 } else { 250 },
         ))
         .stroke(Stroke::new(
             1.0_f32,
-            with_alpha(if highlight { pal().purple_bright } else { pal().border }, if highlight { 185 } else { 160 }),
+            with_alpha(pal().border, if highlight { 255 } else { 190 }),
         ))
-        .corner_radius(egui::CornerRadius::same(6))
+        .corner_radius(egui::CornerRadius::same(3))
         .inner_margin(Margin::symmetric(18, 14))
 }
 
