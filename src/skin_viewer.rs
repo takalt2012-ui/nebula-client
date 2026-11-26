@@ -21,6 +21,7 @@ enum SkinError {
     CurlUnavailable,
     RequestFailed,
     InvalidProfile,
+    NoMojangProfile,
     SkinMissing,
     InvalidTexture,
 }
@@ -30,6 +31,7 @@ impl fmt::Display for SkinError {
         let message = match self {
             Self::CurlUnavailable => "curl is unavailable",
             Self::RequestFailed => "Mojang profile could not be reached",
+            Self::NoMojangProfile => "this account has no Mojang profile (offline accounts have no skin)",
             Self::InvalidProfile => "profile texture data was invalid",
             Self::SkinMissing => "the account has no public skin",
             Self::InvalidTexture => "skin image could not be decoded",
@@ -147,6 +149,30 @@ impl SkinViewer {
                 egui::FontId::proportional(13.0),
                 Color32::from_white_alpha(190),
             );
+            if let Some(reason) = self.load_error.as_deref() {
+                ui.painter().text(
+                    preview.center() + Vec2::new(0.0, 22.0),
+                    egui::Align2::CENTER_CENTER,
+                    reason,
+                    egui::FontId::proportional(11.0),
+                    Color32::from_white_alpha(150),
+                );
+                let retry = Rect::from_center_size(preview.center() + Vec2::new(0.0, 56.0), Vec2::new(84.0, 28.0));
+                let response = ui.interact(retry, egui::Id::new("immersive_skin_retry"), Sense::click())
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                let fill = if response.hovered() { 70 } else { 40 };
+                ui.painter().rect_filled(retry, 6.0, Color32::from_white_alpha(fill));
+                ui.painter().text(
+                    retry.center(),
+                    egui::Align2::CENTER_CENTER,
+                    "Try again",
+                    egui::FontId::proportional(12.0),
+                    Color32::WHITE,
+                );
+                if response.clicked() {
+                    self.requested_uuid = None;
+                }
+            }
         }
     }
 }
@@ -183,6 +209,9 @@ fn fetch_skin(uuid: &str) -> Result<SkinBytes, SkinError> {
 
     let profile_url = format!("https://sessionserver.mojang.com/session/minecraft/profile/{normalized}");
     let profile_bytes = curl_get(&profile_url)?;
+    if profile_bytes.iter().all(u8::is_ascii_whitespace) {
+        return Err(SkinError::NoMojangProfile);
+    }
     let profile: Profile = serde_json::from_slice(&profile_bytes).map_err(|_| SkinError::InvalidProfile)?;
     let encoded = profile.properties.iter().find(|property| property.name == "textures")
         .map(|property| property.value.as_str()).ok_or(SkinError::InvalidProfile)?;
