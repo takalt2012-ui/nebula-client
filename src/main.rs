@@ -2093,7 +2093,7 @@ fn play_button(ui: &mut egui::Ui, width: f32, enabled: bool, starting: bool) -> 
     let rect = if pressed { full.shrink(1.0) } else { full };
     let radius = egui::CornerRadius::same(5);
     let fill = if !enabled {
-        pal().surface_inset
+        pal().surface
     } else if pressed {
         pal().surface_raised
     } else {
