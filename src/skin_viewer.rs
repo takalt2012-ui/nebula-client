@@ -92,7 +92,7 @@ impl SkinViewer {
             self.receiver = uuid.map(request_skin);
         }
 
-        let received = self.receiver.as_ref().map(Receiver::try_recv);
+        let received = self.receiver.as_ref().map(|receiver| receiver.try_recv());
         match received {
             Some(Ok(Ok(data))) => {
                 self.skin_texture = texture_from_bytes(ui.ctx(), "immersive-player-skin", &data.skin);
