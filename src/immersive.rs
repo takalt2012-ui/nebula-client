@@ -116,11 +116,16 @@ impl NebulaClient {
         if !legacy_look() {
             if let Some(texture) = self.immersive_background.as_ref() {
                 let screen = ctx.screen_rect();
+                let background_tint = if self.settings.transparent_window {
+                    Color32::from_white_alpha(205)
+                } else {
+                    Color32::WHITE
+                };
                 ctx.layer_painter(egui::LayerId::background()).image(
                     texture.id(),
                     screen,
                     Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-                    Color32::WHITE,
+                    background_tint,
                 );
             }
         }
