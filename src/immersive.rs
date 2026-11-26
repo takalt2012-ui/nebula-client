@@ -15,7 +15,7 @@ const DOCK_HEIGHT: f32 = 64.0;
 const PLAY_WIDTH: f32 = 300.0;
 const PLAY_HEIGHT: f32 = 56.0;
 const EDGE: f32 = 40.0;
-const ROUND: f32 = 46.0;
+const ROUND: f32 = 40.0;
 const QUICK_PAGES: [(Page, &str); 6] = [
     (Page::Performance, "Performance"),
     (Page::Graphics, "Graphics"),
@@ -88,15 +88,22 @@ fn round_button(
     } else {
         Color32::from_rgba_unmultiplied(14, 10, 30, (150.0 + 50.0 * hover) as u8)
     };
-    let radius = ROUND / 2.0;
-    painter.circle_filled(rect.center(), radius, fill);
-    painter.circle_stroke(
-        rect.center(),
-        radius - 0.5,
+    let button_rect = rect.shrink(0.5);
+    let corner = egui::CornerRadius::same(9);
+    painter.rect_filled(button_rect, corner, fill);
+    painter.rect_stroke(
+        button_rect,
+        corner,
         Stroke::new(1.0_f32, Color32::from_white_alpha((34.0 + 60.0 * hover) as u8)),
+        egui::StrokeKind::Inside,
     );
     if response.has_focus() {
-        painter.circle_stroke(rect.center(), radius + 2.0, Stroke::new(1.5_f32, pal().purple_bright));
+        painter.rect_stroke(
+            button_rect.expand(2.0),
+            egui::CornerRadius::same(11),
+            Stroke::new(1.5_f32, pal().purple_bright),
+            egui::StrokeKind::Outside,
+        );
     }
     let ink = lerp_color(pal().muted, pal().text, if active { 1.0 } else { hover });
     icon(painter, rect.center(), ink);
