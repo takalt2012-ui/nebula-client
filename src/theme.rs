@@ -172,26 +172,26 @@ pub(crate) fn configure_egui(ctx: &Context) {
     style.visuals.widgets.hovered.fg_stroke.color = pal().text;
     style.visuals.widgets.active.fg_stroke.color = pal().text;
     style.visuals.widgets.inactive.bg_fill = pal().surface;
-    style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, with_alpha(pal().border, 190));
+    style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, with_alpha(pal().border, 220));
     style.visuals.widgets.hovered.bg_fill = pal().surface_raised;
-    style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, with_alpha(pal().purple_bright, 175));
+    style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, with_alpha(pal().border, 245));
     style.visuals.widgets.active.bg_fill = pal().purple;
     style.visuals.widgets.open.bg_fill = pal().surface_raised;
     style.visuals.widgets.inactive.weak_bg_fill = pal().surface;
     style.visuals.widgets.hovered.weak_bg_fill = pal().surface_raised;
     style.visuals.widgets.active.weak_bg_fill = pal().purple;
     style.visuals.widgets.open.weak_bg_fill = pal().surface_raised;
-    style.visuals.widgets.open.bg_stroke = Stroke::new(1.0_f32, with_alpha(pal().purple_bright, 185));
-    style.visuals.popup_shadow = egui::epaint::Shadow { offset: [0, 8], blur: 22, spread: 0, color: Color32::from_black_alpha(105) };
+    style.visuals.widgets.open.bg_stroke = Stroke::new(1.0_f32, with_alpha(pal().border, 245));
+    style.visuals.popup_shadow = egui::epaint::Shadow { offset: [0, 3], blur: 8, spread: 0, color: Color32::from_black_alpha(65) };
     style.visuals.selection.bg_fill = pal().purple;
     style.spacing.item_spacing = Vec2::new(10.0, 8.0);
     style.spacing.interact_size = Vec2::new(40.0, 36.0);
     style.spacing.button_padding = Vec2::new(14.0, 8.0);
-    style.visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(5);
-    style.visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(5);
-    style.visuals.widgets.active.corner_radius = egui::CornerRadius::same(5);
-    style.visuals.window_corner_radius = egui::CornerRadius::same(8);
-    style.visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::same(5);
+    style.visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(3);
+    style.visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(3);
+    style.visuals.widgets.active.corner_radius = egui::CornerRadius::same(3);
+    style.visuals.window_corner_radius = egui::CornerRadius::same(4);
+    style.visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::same(3);
     ctx.set_style(style);
 }
 
@@ -203,18 +203,12 @@ pub(crate) fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
 }
 
 /// The main translucent panel that holds a page. The sunset remains visible through it.
-pub(crate) fn glass_frame(alpha: u8) -> Frame {
+pub(crate) fn glass_frame(_alpha: u8) -> Frame {
     Frame::NONE
-        .fill(with_alpha(pal().sidebar, alpha))
-        .stroke(Stroke::new(1.0_f32, with_alpha(pal().border, 115)))
-        .corner_radius(egui::CornerRadius::same(8))
-        .inner_margin(Margin::symmetric(30, 26))
-        .shadow(egui::epaint::Shadow {
-            offset: [0, 7],
-            blur: 20,
-            spread: 0,
-            color: Color32::from_black_alpha(52),
-        })
+        .fill(pal().sidebar)
+        .stroke(Stroke::new(1.0_f32, pal().border))
+        .corner_radius(egui::CornerRadius::same(4))
+        .inner_margin(Margin::symmetric(24, 22))
 }
 
 /// A restrained nested surface. `highlight` marks hover or active state without a bright glass wash.
