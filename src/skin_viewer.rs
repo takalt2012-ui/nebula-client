@@ -13,7 +13,7 @@ use std::{
     thread,
 };
 
-use eframe::egui::{self, Color32, Context, Painter, Pos2, Rect, Sense, Shape, Stroke, TextureHandle, TextureOptions, Vec2};
+use eframe::egui::{self, Color32, Context, Painter, Pos2, Rect, Sense, Shape, TextureHandle, TextureOptions, Vec2};
 use serde::Deserialize;
 
 #[derive(Debug)]
