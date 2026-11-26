@@ -8,6 +8,7 @@ mod immersive;
 mod scene;
 mod setup;
 mod shaders;
+mod skin_viewer;
 mod theme;
 mod widgets;
 
@@ -140,6 +141,7 @@ struct LauncherSettings {
     selected_version: Option<String>,
     selected_resource: Option<String>,
     selected_account: Option<String>,
+    transparent_window: bool,
 }
 
 impl Default for LauncherSettings {
@@ -157,6 +159,7 @@ impl Default for LauncherSettings {
             selected_version: None,
             selected_resource: None,
             selected_account: None,
+            transparent_window: false,
         }
     }
 }
@@ -184,6 +187,8 @@ struct PendingGame {
 
 struct NebulaClient {
     sunset: scene::Sunset,
+    immersive_background: Option<egui::TextureHandle>,
+    skin_viewer: skin_viewer::SkinViewer,
     logo: Option<egui::TextureHandle>,
     page: Page,
     settings: LauncherSettings,
@@ -218,6 +223,8 @@ impl NebulaClient {
         let logo = load_horizon_logo(&cc.egui_ctx);
         let mut app = Self {
             sunset: scene::Sunset::default(),
+            immersive_background: load_immersive_background(&cc.egui_ctx),
+            skin_viewer: skin_viewer::SkinViewer::default(),
             logo,
             page: Page::Play,
             settings,
@@ -1534,6 +1541,17 @@ impl NebulaClient {
             self.persist_selection();
         }
         ui.add_space(8.0);
+        if setting_row(
+            ui,
+            &mut self.settings.transparent_window,
+            "Transparent window",
+            "Lets the desktop show through the launcher canvas. Off by default to prevent accidental see-through windows.",
+            true,
+        ) {
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Transparent(self.settings.transparent_window));
+            self.persist_selection();
+        }
+        ui.add_space(8.0);
         let mut legacy = self.settings.legacy_look;
         if setting_row(
             ui,
@@ -1715,6 +1733,11 @@ impl NebulaClient {
 }
 
 impl eframe::App for NebulaClient {
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        let color = if self.settings.transparent_window { Color32::TRANSPARENT } else { pal().background };
+        [f32::from(color.r()) / 255.0, f32::from(color.g()) / 255.0, f32::from(color.b()) / 255.0, if self.settings.transparent_window { 0.0 } else { 1.0 }]
+    }
+
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         self.poll_game_start(ctx);
         self.poll_setup(ctx);
@@ -1785,6 +1808,7 @@ fn main() -> eframe::Result<()> {
             .with_inner_size([1160.0, 780.0])
             .with_min_inner_size([960.0, 640.0])
             .with_decorations(false)
+            .with_transparent(false)
             .with_drag_and_drop(true)
             .with_title("Nebula Client"),
         renderer: eframe::Renderer::Glow,
@@ -1798,6 +1822,12 @@ fn main() -> eframe::Result<()> {
     )
 }
 
+
+fn load_immersive_background(ctx: &Context) -> Option<egui::TextureHandle> {
+    let image = image::load_from_memory(include_bytes!("../assets/immersive-voxel.png")).ok()?.to_rgba8();
+    let size = [image.width() as usize, image.height() as usize];
+    Some(ctx.load_texture("nebula-immersive-voxel-landscape", egui::ColorImage::from_rgba_unmultiplied(size, image.as_raw()), egui::TextureOptions::NEAREST))
+}
 
 fn load_horizon_logo(ctx: &Context) -> Option<egui::TextureHandle> {
     let bytes = include_bytes!("../horizon-source/launcher/assets/logos/grass-block.png");
