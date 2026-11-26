@@ -92,26 +92,25 @@ impl SkinViewer {
             self.receiver = uuid.map(request_skin);
         }
 
-        if let Some(receiver) = self.receiver.as_ref() {
-            match receiver.try_recv() {
-                Ok(Ok(data)) => {
-                    self.skin_texture = texture_from_bytes(ui.ctx(), "immersive-player-skin", &data.skin);
-                    self.cape_texture = data.cape.as_deref().and_then(|bytes| texture_from_bytes(ui.ctx(), "immersive-player-cape", bytes));
-                    if self.skin_texture.is_none() {
-                        self.load_error = Some(SkinError::InvalidTexture.to_string());
-                    }
-                    self.receiver = None;
+        let received = self.receiver.as_ref().map(Receiver::try_recv);
+        match received {
+            Some(Ok(Ok(data))) => {
+                self.skin_texture = texture_from_bytes(ui.ctx(), "immersive-player-skin", &data.skin);
+                self.cape_texture = data.cape.as_deref().and_then(|bytes| texture_from_bytes(ui.ctx(), "immersive-player-cape", bytes));
+                if self.skin_texture.is_none() {
+                    self.load_error = Some(SkinError::InvalidTexture.to_string());
                 }
-                Ok(Err(error)) => {
-                    self.load_error = Some(error.to_string());
-                    self.receiver = None;
-                }
-                Err(TryRecvError::Disconnected) => {
-                    self.load_error = Some("skin worker stopped unexpectedly".into());
-                    self.receiver = None;
-                }
-                Err(TryRecvError::Empty) => {}
+                self.receiver = None;
             }
+            Some(Ok(Err(error))) => {
+                self.load_error = Some(error.to_string());
+                self.receiver = None;
+            }
+            Some(Err(TryRecvError::Disconnected)) => {
+                self.load_error = Some("skin worker stopped unexpectedly".into());
+                self.receiver = None;
+            }
+            Some(Err(TryRecvError::Empty)) | None => {}
         }
 
         let preview = Rect::from_center_size(
