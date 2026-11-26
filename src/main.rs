@@ -616,7 +616,7 @@ impl NebulaClient {
         let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("bar_accent")));
         painter.line_segment(
             [egui::pos2(rect.left(), rect.bottom() - 1.0), rect.right_bottom()],
-            Stroke::new(1.0, pal().border),
+            Stroke::new(1.0_f32, pal().border),
         );
     }
 
@@ -2104,7 +2104,7 @@ fn play_button(ui: &mut egui::Ui, width: f32, enabled: bool, starting: bool) -> 
     painter.rect_stroke(
         rect,
         radius,
-        Stroke::new(1.0, with_alpha(pal().purple_bright, if enabled { 100 } else { 35 })),
+        Stroke::new(1.0_f32, with_alpha(pal().purple_bright, if enabled { 100 } else { 35 })),
         egui::StrokeKind::Inside,
     );
     let font = FontId::new(18.0, semibold());
