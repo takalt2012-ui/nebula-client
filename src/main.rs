@@ -587,7 +587,7 @@ impl NebulaClient {
             .exact_height(56.0)
             .frame(
                 Frame::NONE
-                    .fill(themed(10, 7, 24, 112))
+                    .fill(pal().sidebar)
                     .inner_margin(Margin::symmetric(16, 8))
                     .stroke(Stroke::new(1.0_f32, themed(255, 255, 255, 22))),
             )
@@ -612,16 +612,11 @@ impl NebulaClient {
                     });
                 });
             });
-        // Sunset-coloured line along the bottom of the bar, drawn above the panels.
         let rect = bar.response.rect;
         let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("bar_accent")));
-        paint_gradient(
-            &painter,
-            egui::Rect::from_min_max(egui::pos2(rect.left(), rect.bottom() - 2.0), rect.right_bottom()),
-            pal().violet.gamma_multiply(0.85),
-            pal().coral.gamma_multiply(0.85),
-            pal().coral.gamma_multiply(0.85),
-            pal().violet.gamma_multiply(0.85),
+        painter.line_segment(
+            [egui::pos2(rect.left(), rect.bottom() - 1.0), rect.right_bottom()],
+            Stroke::new(1.0, pal().border),
         );
     }
 
@@ -632,7 +627,7 @@ impl NebulaClient {
             .exact_width(if compact { 78.0 } else { 196.0 })
             .frame(
                 Frame::NONE
-                    .fill(themed(10, 7, 24, 100))
+                    .fill(pal().sidebar)
                     .inner_margin(Margin { left: 12, right: 12, top: 24, bottom: 18 })
                     .stroke(Stroke::new(1.0_f32, themed(255, 255, 255, 22))),
             )
@@ -1723,7 +1718,9 @@ impl eframe::App for NebulaClient {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         self.poll_game_start(ctx);
         self.poll_setup(ctx);
-        self.sunset.paint(ctx);
+        if legacy_look() {
+            self.sunset.paint(ctx);
+        }
         // Ctrl/Cmd + 1..7 jumps to a page.
         const PAGE_KEYS: [egui::Key; 7] = [
             egui::Key::Num1,
@@ -1760,9 +1757,9 @@ impl eframe::App for NebulaClient {
         self.windowbar(ctx);
         self.sidebar(ctx);
 
-        // No full-screen overlay: the sunset stays visible around a single glass panel.
+        // The original sunset is a Legacy-only backdrop. Nebula Green uses its own quiet canvas.
         egui::CentralPanel::default()
-            .frame(Frame::NONE.inner_margin(Margin::symmetric(32, 24)))
+            .frame(Frame::NONE.fill(pal().background).inner_margin(Margin::symmetric(32, 24)))
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                     let width = (ui.available_width() - 56.0).clamp(320.0, 900.0);
@@ -1939,7 +1936,7 @@ fn account_chip(ui: &mut egui::Ui, account: Option<&str>) {
     Frame::NONE
         .fill(Color32::from_white_alpha(16))
         .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(34)))
-        .corner_radius(egui::CornerRadius::same(16))
+        .corner_radius(egui::CornerRadius::same(5))
         .inner_margin(Margin::symmetric(10, 3))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -1976,12 +1973,12 @@ fn nav_item(ui: &mut egui::Ui, page: Page, label: &str, selected: bool, compact:
         painter.rect_filled(
             rect,
             10.0,
-            Color32::from_rgba_unmultiplied(75, 48, 119, (active * 150.0) as u8),
+            with_alpha(pal().purple, (active * 150.0) as u8),
         );
         painter.rect_stroke(
             rect,
             10.0,
-            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(190, 158, 255, (active * 90.0) as u8)),
+            Stroke::new(1.0_f32, with_alpha(pal().purple_bright, (active * 90.0) as u8)),
             egui::StrokeKind::Inside,
         );
         painter.rect_filled(
@@ -2094,29 +2091,22 @@ fn play_button(ui: &mut egui::Ui, width: f32, enabled: bool, starting: bool) -> 
     let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), response.hovered() && enabled, 0.15);
     let pressed = enabled && response.is_pointer_button_down_on();
     let rect = if pressed { full.shrink(1.0) } else { full };
-    let radius = egui::CornerRadius::same(14);
-    // White text needs 4.5:1, so the fill stays a deep violet even when hovered.
+    let radius = egui::CornerRadius::same(5);
     let fill = if !enabled {
-        themed_rgb(52, 46, 76)
+        pal().surface_inset
     } else if pressed {
-        themed_rgb(98, 60, 205)
+        pal().surface_raised
     } else {
-        lerp_color(themed_rgb(112, 70, 228), pal().purple, hover)
+        lerp_color(pal().purple, pal().surface_raised, hover * 0.22)
     };
     let painter = ui.painter();
-    if enabled {
-        // A soft violet glow under the button, a little stronger on hover.
-        painter.add(
-            egui::epaint::Shadow {
-                offset: [0, 8],
-                blur: 24,
-                spread: 0,
-                color: pal().violet.gamma_multiply(0.30 + 0.20 * hover),
-            }
-            .as_shape(rect, radius),
-        );
-    }
     painter.rect_filled(rect, radius, fill);
+    painter.rect_stroke(
+        rect,
+        radius,
+        Stroke::new(1.0, with_alpha(pal().purple_bright, if enabled { 100 } else { 35 })),
+        egui::StrokeKind::Inside,
+    );
     let font = FontId::new(18.0, semibold());
     let color = if enabled { Color32::WHITE } else { pal().muted.gamma_multiply(0.7) };
     if starting {
