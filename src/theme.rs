@@ -112,7 +112,7 @@ pub(crate) fn themed_rgb(r: u8, g: u8, b: u8) -> Color32 {
 
 /// Opacity of the main glass panel. Higher keeps text readable over the bright sunset glow;
 /// lower shows more of the sunset. Text colours are chosen for at least 4.5:1 at this value.
-pub(crate) const GLASS_ALPHA: u8 = 140;
+pub(crate) const GLASS_ALPHA: u8 = 218;
 
 pub(crate) fn medium() -> FontFamily {
     FontFamily::Name("Horizon Geist Medium".into())
