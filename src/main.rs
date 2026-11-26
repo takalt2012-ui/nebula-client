@@ -2,7 +2,9 @@
 //! It delegates managed game starts to Horizon's own `play` command so cache leases,
 //! instance configuration and account-session handoff remain correct.
 
+mod brand;
 mod hud;
+mod immersive;
 mod scene;
 mod setup;
 mod shaders;
@@ -94,9 +96,38 @@ impl Capabilities {
     }
 }
 
+/// Which layout the launcher uses.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Interface {
+    #[default]
+    Classic,
+    Immersive,
+}
+
+impl Interface {
+    const OPTIONS: [(&'static str, &'static str); 2] = [("classic", "Classic"), ("immersive", "Immersive")];
+
+    fn key(self) -> &'static str {
+        match self {
+            Self::Classic => "classic",
+            Self::Immersive => "immersive",
+        }
+    }
+
+    fn from_key(key: &str) -> Option<Self> {
+        match key {
+            "classic" => Some(Self::Classic),
+            "immersive" => Some(Self::Immersive),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 struct LauncherSettings {
+    interface: Interface,
     performance_mode: bool,
     gamemode: bool,
     mangohud: bool,
@@ -112,6 +143,7 @@ struct LauncherSettings {
 impl Default for LauncherSettings {
     fn default() -> Self {
         Self {
+            interface: Interface::Classic,
             performance_mode: true,
             gamemode: false,
             mangohud: false,
@@ -730,18 +762,7 @@ impl NebulaClient {
         });
 
         ui.add_space(20.0);
-        // Same four requirements the launch path checks, surfaced before the click.
-        let blocker = if self.official_launcher.is_none() {
-            Some("Horizon's sign-in helper was not found.")
-        } else if self.selected_version().is_none() {
-            Some("Choose a Horizon build above.")
-        } else if self.selected_resource().is_none() {
-            Some("This build has no prepared resource set.")
-        } else if self.selected_account_id().is_none() {
-            Some("Load and choose an account to play.")
-        } else {
-            None
-        };
+        let blocker = self.play_blocker();
         const REFRESH_WIDTH: f32 = 170.0;
         let play_width = (ui.available_width() - REFRESH_WIDTH - 12.0).max(200.0);
         let (play, refresh) = ui
@@ -959,6 +980,33 @@ impl NebulaClient {
             }
         }
         self.status_line(ui);
+    }
+
+    /// Why Play is unavailable, or None when every launch requirement is met.
+    fn play_blocker(&self) -> Option<&'static str> {
+        if self.official_launcher.is_none() {
+            Some("Horizon's sign-in helper was not found.")
+        } else if self.selected_version().is_none() {
+            Some("Choose a Horizon build above.")
+        } else if self.selected_resource().is_none() {
+            Some("This build has no prepared resource set.")
+        } else if self.selected_account_id().is_none() {
+            Some("Load and choose an account to play.")
+        } else {
+            None
+        }
+    }
+
+    fn page_body(&mut self, ui: &mut egui::Ui, ctx: &Context) {
+        match self.page {
+            Page::Play => self.play_page(ui, ctx),
+            Page::Performance => self.performance_page(ui),
+            Page::Graphics => self.graphics_page(ui),
+            Page::Customize => self.customize_page(ui),
+            Page::Shaders => self.shaders_page(ui, ctx),
+            Page::Diagnostics => self.diagnostics_page(ui),
+            Page::Settings => self.settings_page(ui),
+        }
     }
 
     fn customize_page(&mut self, ui: &mut egui::Ui) {
@@ -1485,6 +1533,19 @@ impl NebulaClient {
         ) {
             self.persist_selection();
         }
+        ui.add_space(8.0);
+        let picked = choice_row(
+            ui,
+            "Interface",
+            "Classic keeps the sidebar and panels. Immersive fills the window with the sunset and opens pages as cards.",
+            &Interface::OPTIONS,
+            self.settings.interface.key(),
+        );
+        if let Some(interface) = picked.as_deref().and_then(Interface::from_key) {
+            self.settings.interface = interface;
+            self.page = Page::Play;
+            self.persist_selection();
+        }
         self.status_line(ui);
     }
 
@@ -1674,6 +1735,10 @@ impl eframe::App for NebulaClient {
                 fade = 1.0 - (1.0 - t).powi(3);
             }
         }
+        if self.settings.interface == Interface::Immersive {
+            self.immersive(ctx);
+            return;
+        }
         self.windowbar(ctx);
         self.sidebar(ctx);
 
@@ -1687,15 +1752,7 @@ impl eframe::App for NebulaClient {
                     let alpha = (GLASS_ALPHA as f32 * (0.55 + 0.45 * fade)) as u8;
                     glass_card(ui, glass_frame(alpha), |ui| {
                         ui.set_width(width);
-                        match self.page {
-                            Page::Play => self.play_page(ui, ctx),
-                            Page::Performance => self.performance_page(ui),
-                            Page::Graphics => self.graphics_page(ui),
-                            Page::Customize => self.customize_page(ui),
-                            Page::Shaders => self.shaders_page(ui, ctx),
-                            Page::Diagnostics => self.diagnostics_page(ui),
-                            Page::Settings => self.settings_page(ui),
-                        }
+                        self.page_body(ui, ctx);
                     });
                 });
             });
