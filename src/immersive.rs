@@ -181,40 +181,12 @@ impl NebulaClient {
         let mut open = None;
         ui.scope_builder(UiBuilder::new().max_rect(area).layout(Layout::top_down(Align::Max)), |ui| {
             ui.spacing_mut().item_spacing.y = 12.0;
-            ui.allocate_ui_with_layout(Vec2::new(area.width(), 56.0), Layout::right_to_left(Align::Center), |ui| {
-                let (avatar, response) = ui.allocate_exact_size(Vec2::splat(56.0), Sense::click());
-                let painter = ui.painter();
-                let initial = name.and_then(|text| text.chars().next());
-                painter.circle_filled(
-                    avatar.center(),
-                    28.0,
-                    if initial.is_some() { pal().violet } else { themed(14, 10, 30, 170) },
-                );
-                match initial {
-                    Some(letter) => {
-                        painter.text(
-                            avatar.center(),
-                            Align2::CENTER_CENTER,
-                            letter.to_uppercase().to_string(),
-                            FontId::new(22.0, semibold()),
-                            Color32::WHITE,
-                        );
-                    }
-                    None => paint_icon(painter, Icon::User, avatar.center(), 22.0, pal().muted, 0.0),
-                }
-                painter.circle_stroke(avatar.center(), 27.0, Stroke::new(2.0_f32, Color32::from_white_alpha(170)));
-                if can_switch {
-                    switch = response.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text("Switch account").clicked();
-                }
-                ui.add_space(6.0);
-                match name {
-                    Some(text) => {
-                        ui.label(RichText::new(text).size(16.0).family(semibold()).color(pal().text));
-                    }
-                    None => {
-                        let label = RichText::new("Sign in").size(16.0).family(semibold()).color(pal().text);
-                        sign_in = ui.add(egui::Label::new(label).sense(Sense::click())).clicked();
-                    }
+            ui.allocate_ui_with_layout(Vec2::new(area.width(), 48.0), Layout::right_to_left(Align::Center), |ui| {
+                let clicked = account_control(ui, name, can_switch);
+                if name.is_some() {
+                    switch = clicked && can_switch;
+                } else {
+                    sign_in = clicked;
                 }
             });
             for (page, tip) in QUICK_PAGES {
@@ -376,4 +348,59 @@ impl NebulaClient {
             self.page = Page::Play;
         }
     }
+}
+
+/// The whole account area is one painted control: avatar and name share a single hit target, so
+/// hover, focus and pressed feedback apply to both. Painted text cannot be selected by accident.
+/// Returns true when it was clicked. A lone signed-in account has nothing to switch to, so it is
+/// drawn as a plain badge without hover feedback.
+fn account_control(ui: &mut egui::Ui, name: Option<&str>, interactive: bool) -> bool {
+    let signed_in = name.is_some();
+    let label = name.unwrap_or("Sign in");
+    let font = FontId::new(15.0, semibold());
+    let text_width = ui.painter().layout_no_wrap(label.to_owned(), font.clone(), Color32::WHITE).size().x;
+    let avatar = 34.0;
+    let chevron = if signed_in && interactive { 22.0 } else { 0.0 };
+    let width = 8.0 + avatar + 10.0 + text_width + 16.0 + chevron;
+    let sense = if interactive || !signed_in { Sense::click() } else { Sense::hover() };
+    let (rect, response) = ui.allocate_exact_size(Vec2::new(width, 46.0), sense);
+    let live = sense == Sense::click();
+    let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), live && response.hovered(), 0.12);
+    let pressed = live && response.is_pointer_button_down_on();
+    let painter = ui.painter();
+    let fill = if pressed {
+        themed(5, 31, 32, 215)
+    } else {
+        themed(5, 31, 32, (150.0 + hover * 40.0) as u8)
+    };
+    let radius = rect.height() / 2.0;
+    painter.rect_filled(rect, radius, fill);
+    let border = 40.0 + hover * 70.0;
+    painter.rect_stroke(rect, radius, Stroke::new(1.0_f32, Color32::from_white_alpha(border as u8)), egui::StrokeKind::Inside);
+    if response.has_focus() {
+        painter.rect_stroke(rect.expand(2.0), radius + 2.0, Stroke::new(2.0_f32, pal().purple_bright), egui::StrokeKind::Outside);
+    }
+    let center = Pos2::new(rect.left() + 8.0 + avatar / 2.0, rect.center().y);
+    match name.and_then(|text| text.chars().next()) {
+        Some(letter) => {
+            painter.circle_filled(center, avatar / 2.0, pal().violet);
+            painter.text(center, Align2::CENTER_CENTER, letter.to_uppercase().to_string(), FontId::new(16.0, semibold()), Color32::WHITE);
+        }
+        None => {
+            painter.circle_filled(center, avatar / 2.0, Color32::from_white_alpha(28));
+            paint_icon(painter, Icon::User, center, 16.0, pal().text, 0.0);
+        }
+    }
+    painter.text(Pos2::new(center.x + avatar / 2.0 + 10.0, rect.center().y), Align2::LEFT_CENTER, label, font, pal().text);
+    if chevron > 0.0 {
+        let c = Pos2::new(rect.right() - 20.0, rect.center().y);
+        let stroke = Stroke::new(1.6_f32, pal().muted);
+        painter.line_segment([c + Vec2::new(-4.0, -2.0), c + Vec2::new(0.0, 2.0)], stroke);
+        painter.line_segment([c + Vec2::new(0.0, 2.0), c + Vec2::new(4.0, -2.0)], stroke);
+    }
+    if !live {
+        return false;
+    }
+    let tip = if signed_in { "Switch account" } else { "Sign in with your Microsoft account" };
+    response.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(tip).clicked()
 }
