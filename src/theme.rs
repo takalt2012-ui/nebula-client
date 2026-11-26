@@ -10,6 +10,10 @@ use eframe::egui::{self, Color32, Context, FontFamily, Frame, Margin, Stroke, Ve
 pub(crate) struct Palette {
     pub(crate) sidebar: Color32,
     pub(crate) background: Color32,
+    pub(crate) surface: Color32,
+    pub(crate) surface_raised: Color32,
+    pub(crate) surface_inset: Color32,
+    pub(crate) border: Color32,
     pub(crate) text: Color32,
     pub(crate) muted: Color32,
     pub(crate) purple: Color32,
@@ -23,8 +27,12 @@ pub(crate) struct Palette {
 }
 
 pub(crate) const GREEN: Palette = Palette {
-    sidebar: Color32::from_rgb(11, 43, 38),
     background: Color32::from_rgb(5, 31, 32),
+    sidebar: Color32::from_rgb(11, 43, 38),
+    surface: Color32::from_rgb(22, 56, 50),
+    surface_raised: Color32::from_rgb(35, 83, 71),
+    surface_inset: Color32::from_rgb(11, 43, 38),
+    border: Color32::from_rgb(35, 83, 71),
     text: Color32::from_rgb(218, 241, 222),
     muted: Color32::from_rgb(176, 211, 186),
     purple: Color32::from_rgb(35, 83, 71),
@@ -37,8 +45,12 @@ pub(crate) const GREEN: Palette = Palette {
 };
 
 pub(crate) const LEGACY: Palette = Palette {
-    sidebar: Color32::from_rgb(17, 15, 34),
     background: Color32::from_rgb(9, 7, 25),
+    sidebar: Color32::from_rgb(17, 15, 34),
+    surface: Color32::from_rgb(26, 18, 48),
+    surface_raised: Color32::from_rgb(46, 29, 72),
+    surface_inset: Color32::from_rgb(17, 15, 34),
+    border: Color32::from_rgb(63, 54, 86),
     text: Color32::from_rgb(246, 242, 255),
     muted: Color32::from_rgb(204, 198, 224),
     purple: Color32::from_rgb(123, 78, 245),
@@ -66,16 +78,27 @@ pub(crate) fn pal() -> Palette {
     if legacy_look() { LEGACY } else { GREEN }
 }
 
+/// Applies opacity without changing a palette colour's RGB channels.
+pub(crate) fn with_alpha(color: Color32, alpha: u8) -> Color32 {
+    Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
+}
+
 /// Maps a colour written for the Legacy look to its green-theme equivalent. Anything not in the
 /// table passes through unchanged, so neutral greys and whites stay as they are.
 fn green_of(rgb: (u8, u8, u8)) -> (u8, u8, u8) {
     match rgb {
-        (139, 91, 249) | (143, 92, 255) => (35, 83, 71),
-        (115, 69, 176) | (46, 29, 72) => (22, 58, 50),
-        (146, 96, 224) => (45, 96, 84),
-        (225, 205, 255) | (204, 174, 255) | (205, 173, 255) | (214, 190, 255) => (142, 182, 155),
-        (16, 11, 36) | (17, 15, 34) | (26, 18, 48) => (11, 43, 38),
+        (139, 91, 249) | (143, 92, 255) | (75, 48, 119) => (35, 83, 71),
+        (115, 69, 176) | (46, 29, 72) | (52, 36, 82) => (22, 56, 50),
+        (146, 96, 224) | (112, 70, 228) | (98, 60, 205) => (35, 83, 71),
+        (225, 205, 255) | (204, 174, 255) | (205, 173, 255) | (214, 190, 255)
+        | (190, 158, 255) | (198, 168, 255) => (142, 182, 155),
+        (16, 11, 36) | (17, 15, 34) | (26, 18, 48) | (19, 15, 33)
+        | (14, 10, 30) | (54, 49, 68) | (52, 46, 76) | (22, 15, 46)
+        | (8, 5, 22) | (8, 5, 22) => (11, 43, 38),
         (10, 7, 24) | (9, 7, 25) => (5, 31, 32),
+        (214, 207, 232) | (226, 220, 242) => (176, 211, 186),
+        (190, 183, 212) => (176, 211, 186),
+        (78, 66, 112) | (70, 58, 108) => (22, 56, 50),
         other => other,
     }
 }
@@ -143,28 +166,26 @@ pub(crate) fn configure_egui(ctx: &Context) {
     let mut style = (*ctx.style()).clone();
     style.visuals = egui::Visuals::dark();
     style.visuals.panel_fill = pal().background;
-    style.visuals.window_fill = themed_rgb(26, 18, 48);
-    style.visuals.window_stroke = Stroke::new(1.0_f32, themed(255, 255, 255, 40));
-    // Separators and hairlines use a faint white so they read as glass edges.
-    style.visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, themed(255, 255, 255, 26));
+    style.visuals.window_fill = pal().surface;
+    style.visuals.window_stroke = Stroke::new(1.0_f32, with_alpha(pal().border, 180));
+    style.visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, with_alpha(pal().border, 100));
     style.visuals.extreme_bg_color = pal().sidebar;
     style.visuals.widgets.noninteractive.fg_stroke.color = pal().text;
     style.visuals.widgets.inactive.fg_stroke.color = pal().text;
     style.visuals.widgets.hovered.fg_stroke.color = pal().text;
     style.visuals.widgets.active.fg_stroke.color = pal().text;
-    style.visuals.widgets.inactive.bg_fill = themed(115, 69, 176, 65);
-    style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, themed(204, 174, 255, 64));
-    style.visuals.widgets.hovered.bg_fill = themed(146, 96, 224, 110);
-    style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, themed(225, 205, 255, 120));
+    style.visuals.widgets.inactive.bg_fill = pal().surface;
+    style.visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, with_alpha(pal().border, 190));
+    style.visuals.widgets.hovered.bg_fill = pal().surface_raised;
+    style.visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, with_alpha(pal().purple_bright, 175));
     style.visuals.widgets.active.bg_fill = pal().purple;
-    style.visuals.widgets.open.bg_fill = themed_rgb(46, 29, 72);
-    // Any stock button that slips through still gets the glass look instead of flat grey.
-    style.visuals.widgets.inactive.weak_bg_fill = themed(115, 69, 176, 65);
-    style.visuals.widgets.hovered.weak_bg_fill = themed(146, 96, 224, 110);
+    style.visuals.widgets.open.bg_fill = pal().surface_raised;
+    style.visuals.widgets.inactive.weak_bg_fill = pal().surface;
+    style.visuals.widgets.hovered.weak_bg_fill = pal().surface_raised;
     style.visuals.widgets.active.weak_bg_fill = pal().purple;
-    style.visuals.widgets.open.weak_bg_fill = themed_rgb(46, 29, 72);
-    style.visuals.widgets.open.bg_stroke = Stroke::new(1.0_f32, themed(205, 173, 255, 90));
-    style.visuals.popup_shadow = egui::epaint::Shadow { offset: [0, 10], blur: 28, spread: 0, color: Color32::from_black_alpha(130) };
+    style.visuals.widgets.open.weak_bg_fill = pal().surface_raised;
+    style.visuals.widgets.open.bg_stroke = Stroke::new(1.0_f32, with_alpha(pal().purple_bright, 185));
+    style.visuals.popup_shadow = egui::epaint::Shadow { offset: [0, 8], blur: 22, spread: 0, color: Color32::from_black_alpha(105) };
     style.visuals.selection.bg_fill = pal().purple;
     style.spacing.item_spacing = Vec2::new(10.0, 8.0);
     style.spacing.interact_size = Vec2::new(40.0, 36.0);
@@ -187,33 +208,28 @@ pub(crate) fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
 /// The main translucent panel that holds a page. The sunset remains visible through it.
 pub(crate) fn glass_frame(alpha: u8) -> Frame {
     Frame::NONE
-        .fill(themed(16, 11, 36, alpha))
-        .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(26)))
-        .corner_radius(egui::CornerRadius::same(20))
-        .inner_margin(Margin::symmetric(32, 28))
+        .fill(with_alpha(pal().sidebar, alpha))
+        .stroke(Stroke::new(1.0_f32, with_alpha(pal().border, 115)))
+        .corner_radius(egui::CornerRadius::same(18))
+        .inner_margin(Margin::symmetric(30, 26))
         .shadow(egui::epaint::Shadow {
-            offset: [0, 8],
-            blur: 24,
+            offset: [0, 7],
+            blur: 20,
             spread: 0,
-            color: Color32::from_black_alpha(60),
+            color: Color32::from_black_alpha(52),
         })
 }
 
 /// A restrained nested surface. `highlight` marks hover or active state without a bright glass wash.
 pub(crate) fn inner_card(highlight: bool) -> Frame {
     Frame::NONE
-        .fill(if highlight {
-            themed(52, 36, 82, 218)
-        } else {
-            themed(19, 15, 33, 218)
-        })
+        .fill(with_alpha(
+            if highlight { pal().surface_raised } else { pal().surface },
+            if highlight { 246 } else { 232 },
+        ))
         .stroke(Stroke::new(
             1.0_f32,
-            if highlight {
-                themed(187, 147, 255, 148)
-            } else {
-                themed(216, 205, 239, 32)
-            },
+            with_alpha(if highlight { pal().purple_bright } else { pal().border }, if highlight { 185 } else { 160 }),
         ))
         .corner_radius(egui::CornerRadius::same(12))
         .inner_margin(Margin::symmetric(18, 14))
