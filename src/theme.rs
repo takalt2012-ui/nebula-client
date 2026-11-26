@@ -60,7 +60,7 @@ pub(crate) const LEGACY: Palette = Palette {
 
 static LEGACY_LOOK: AtomicBool = AtomicBool::new(false);
 
-/// Switches between the green theme and the Legacy look for everything drawn after this call.
+/// Selects the modern violet palette or the preserved Legacy palette for subsequent painting.
 pub(crate) fn set_legacy_look(on: bool) {
     LEGACY_LOOK.store(on, Ordering::Relaxed);
 }
@@ -79,9 +79,8 @@ pub(crate) fn with_alpha(color: Color32, alpha: u8) -> Color32 {
     Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
 }
 
-/// Maps a colour written for the Legacy look to its green-theme equivalent. Anything not in the
-/// table passes through unchanged, so neutral greys and whites stay as they are.
-fn green_of(rgb: (u8, u8, u8)) -> (u8, u8, u8) {
+/// Translates older palette literals into the modern palette; neutral colours pass through.
+fn modern_of(rgb: (u8, u8, u8)) -> (u8, u8, u8) {
     match rgb {
         (139, 91, 249) | (143, 92, 255) | (75, 48, 119) => (103, 66, 220),
         (115, 69, 176) | (46, 29, 72) | (52, 36, 82) => (25, 19, 43),
@@ -97,14 +96,13 @@ fn green_of(rgb: (u8, u8, u8)) -> (u8, u8, u8) {
         other => other,
     }
 }
-/// A translucent colour from a Legacy-look RGB value, translated for the green theme when that
-/// theme is active. Use this where a literal tint was written with `from_rgba_unmultiplied`.
+/// A Legacy palette tint translated to the modern palette when Legacy mode is inactive.
 pub(crate) fn themed(r: u8, g: u8, b: u8, alpha: u8) -> Color32 {
-    let (r, g, b) = if legacy_look() { (r, g, b) } else { green_of((r, g, b)) };
+    let (r, g, b) = if legacy_look() { (r, g, b) } else { modern_of((r, g, b)) };
     Color32::from_rgba_unmultiplied(r, g, b, alpha)
 }
 
-/// An opaque colour from a Legacy-look RGB value, translated like [`themed`].
+/// An opaque Legacy palette colour translated like [`themed`].
 pub(crate) fn themed_rgb(r: u8, g: u8, b: u8) -> Color32 {
     let (r, g, b) = if legacy_look() { (r, g, b) } else { green_of((r, g, b)) };
     Color32::from_rgb(r, g, b)
@@ -199,10 +197,10 @@ pub(crate) fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
     Color32::from_rgb(mix(a.r(), b.r()), mix(a.g(), b.g()), mix(a.b(), b.b()))
 }
 
-/// The main translucent panel that holds a page. The sunset remains visible through it.
-pub(crate) fn glass_frame(_alpha: u8) -> Frame {
+/// The main panel; its alpha lets the Legacy sunset show through without washing out text.
+pub(crate) fn glass_frame(alpha: u8) -> Frame {
     Frame::NONE
-        .fill(pal().sidebar)
+        .fill(with_alpha(pal().sidebar, alpha))
         .stroke(Stroke::new(1.0_f32, pal().border))
         .corner_radius(egui::CornerRadius::same(4))
         .inner_margin(Margin::symmetric(24, 22))
