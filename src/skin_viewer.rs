@@ -320,13 +320,39 @@ fn draw_player(painter: &Painter, rect: Rect, skin: &TextureHandle, cape: Option
         UvRect::new(0.0, 8.0, 8.0, 8.0), UvRect::new(16.0, 8.0, 8.0, 8.0),
         UvRect::new(8.0, 0.0, 8.0, 8.0), UvRect::new(16.0, 0.0, 8.0, 8.0),
     );
+    let leg_layer = SkinUv::new(
+        UvRect::new(4.0, 36.0, 4.0, 12.0), UvRect::new(12.0, 36.0, 4.0, 12.0),
+        UvRect::new(0.0, 36.0, 4.0, 12.0), UvRect::new(8.0, 36.0, 4.0, 12.0),
+        UvRect::new(4.0, 32.0, 4.0, 4.0), UvRect::new(8.0, 32.0, 4.0, 4.0),
+    );
+    let torso_layer = SkinUv::new(
+        UvRect::new(20.0, 36.0, 8.0, 12.0), UvRect::new(32.0, 36.0, 8.0, 12.0),
+        UvRect::new(16.0, 36.0, 4.0, 12.0), UvRect::new(28.0, 36.0, 4.0, 12.0),
+        UvRect::new(20.0, 32.0, 8.0, 4.0), UvRect::new(28.0, 32.0, 8.0, 4.0),
+    );
+    let arm_layer = SkinUv::new(
+        UvRect::new(44.0, 36.0, 4.0, 12.0), UvRect::new(52.0, 36.0, 4.0, 12.0),
+        UvRect::new(40.0, 36.0, 4.0, 12.0), UvRect::new(48.0, 36.0, 4.0, 12.0),
+        UvRect::new(44.0, 32.0, 4.0, 4.0), UvRect::new(48.0, 32.0, 4.0, 4.0),
+    );
+    let head_layer = SkinUv::new(
+        UvRect::new(40.0, 8.0, 8.0, 8.0), UvRect::new(56.0, 8.0, 8.0, 8.0),
+        UvRect::new(32.0, 8.0, 8.0, 8.0), UvRect::new(48.0, 8.0, 8.0, 8.0),
+        UvRect::new(40.0, 0.0, 8.0, 8.0), UvRect::new(48.0, 0.0, 8.0, 8.0),
+    );
 
     draw_box(painter, skin.id(), center, scale, yaw, [-2.0, -5.5, 0.0], [4.0, 12.0, 4.0], leg);
     draw_box(painter, skin.id(), center, scale, yaw, [2.0, -5.5, 0.0], [4.0, 12.0, 4.0], leg);
+    draw_box(painter, skin.id(), center, scale, yaw, [-2.0, -5.5, 0.0], [4.18, 12.18, 4.18], leg_layer);
+    draw_box(painter, skin.id(), center, scale, yaw, [2.0, -5.5, 0.0], [4.18, 12.18, 4.18], leg_layer);
     draw_box(painter, skin.id(), center, scale, yaw, [0.0, 1.0, 0.0], [8.0, 12.0, 4.0], torso);
+    draw_box(painter, skin.id(), center, scale, yaw, [0.0, 1.0, 0.0], [8.18, 12.18, 4.18], torso_layer);
     draw_box(painter, skin.id(), center, scale, yaw, [-6.0, 1.0, 0.0], [4.0, 12.0, 4.0], arm);
     draw_box(painter, skin.id(), center, scale, yaw, [6.0, 1.0, 0.0], [4.0, 12.0, 4.0], arm);
+    draw_box(painter, skin.id(), center, scale, yaw, [-6.0, 1.0, 0.0], [4.18, 12.18, 4.18], arm_layer);
+    draw_box(painter, skin.id(), center, scale, yaw, [6.0, 1.0, 0.0], [4.18, 12.18, 4.18], arm_layer);
     draw_box(painter, skin.id(), center, scale, yaw, [0.0, 10.5, 0.0], [8.0, 8.0, 8.0], head);
+    draw_box(painter, skin.id(), center, scale, yaw, [0.0, 10.5, 0.0], [8.28, 8.28, 8.28], head_layer);
 }
 
 fn draw_cape(painter: &Painter, center: Pos2, scale: f32, yaw: f32, texture: &TextureHandle) {
