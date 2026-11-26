@@ -12,7 +12,6 @@ pub(crate) struct Palette {
     pub(crate) background: Color32,
     pub(crate) surface: Color32,
     pub(crate) surface_raised: Color32,
-    pub(crate) surface_inset: Color32,
     pub(crate) border: Color32,
     pub(crate) text: Color32,
     pub(crate) muted: Color32,
@@ -31,7 +30,6 @@ pub(crate) const GREEN: Palette = Palette {
     sidebar: Color32::from_rgb(11, 43, 38),
     surface: Color32::from_rgb(22, 56, 50),
     surface_raised: Color32::from_rgb(35, 83, 71),
-    surface_inset: Color32::from_rgb(11, 43, 38),
     border: Color32::from_rgb(35, 83, 71),
     text: Color32::from_rgb(218, 241, 222),
     muted: Color32::from_rgb(176, 211, 186),
@@ -49,7 +47,6 @@ pub(crate) const LEGACY: Palette = Palette {
     sidebar: Color32::from_rgb(17, 15, 34),
     surface: Color32::from_rgb(26, 18, 48),
     surface_raised: Color32::from_rgb(46, 29, 72),
-    surface_inset: Color32::from_rgb(17, 15, 34),
     border: Color32::from_rgb(63, 54, 86),
     text: Color32::from_rgb(246, 242, 255),
     muted: Color32::from_rgb(204, 198, 224),
@@ -94,7 +91,7 @@ fn green_of(rgb: (u8, u8, u8)) -> (u8, u8, u8) {
         | (190, 158, 255) | (198, 168, 255) => (142, 182, 155),
         (16, 11, 36) | (17, 15, 34) | (26, 18, 48) | (19, 15, 33)
         | (14, 10, 30) | (54, 49, 68) | (52, 46, 76) | (22, 15, 46)
-        | (8, 5, 22) | (8, 5, 22) => (11, 43, 38),
+        | (8, 5, 22) => (11, 43, 38),
         (10, 7, 24) | (9, 7, 25) => (5, 31, 32),
         (214, 207, 232) | (226, 220, 242) => (176, 211, 186),
         (190, 183, 212) => (176, 211, 186),
@@ -190,11 +187,11 @@ pub(crate) fn configure_egui(ctx: &Context) {
     style.spacing.item_spacing = Vec2::new(10.0, 8.0);
     style.spacing.interact_size = Vec2::new(40.0, 36.0);
     style.spacing.button_padding = Vec2::new(14.0, 8.0);
-    style.visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(10);
-    style.visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(10);
-    style.visuals.widgets.active.corner_radius = egui::CornerRadius::same(10);
-    style.visuals.window_corner_radius = egui::CornerRadius::same(16);
-    style.visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::same(10);
+    style.visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(5);
+    style.visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(5);
+    style.visuals.widgets.active.corner_radius = egui::CornerRadius::same(5);
+    style.visuals.window_corner_radius = egui::CornerRadius::same(8);
+    style.visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::same(5);
     ctx.set_style(style);
 }
 
@@ -210,7 +207,7 @@ pub(crate) fn glass_frame(alpha: u8) -> Frame {
     Frame::NONE
         .fill(with_alpha(pal().sidebar, alpha))
         .stroke(Stroke::new(1.0_f32, with_alpha(pal().border, 115)))
-        .corner_radius(egui::CornerRadius::same(18))
+        .corner_radius(egui::CornerRadius::same(8))
         .inner_margin(Margin::symmetric(30, 26))
         .shadow(egui::epaint::Shadow {
             offset: [0, 7],
@@ -231,7 +228,7 @@ pub(crate) fn inner_card(highlight: bool) -> Frame {
             1.0_f32,
             with_alpha(if highlight { pal().purple_bright } else { pal().border }, if highlight { 185 } else { 160 }),
         ))
-        .corner_radius(egui::CornerRadius::same(12))
+        .corner_radius(egui::CornerRadius::same(6))
         .inner_margin(Margin::symmetric(18, 14))
 }
 
