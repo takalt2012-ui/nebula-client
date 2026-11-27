@@ -341,9 +341,19 @@ impl SkinUv {
     }
 }
 
+#[derive(Clone, Copy)]
+struct RenderFace {
+    depth: f32,
+    points: [Pos2; 4],
+    uv: UvRect,
+}
+
 fn draw_player(painter: &Painter, rect: Rect, skin: &TextureHandle, cape: Option<&TextureHandle>, yaw: f32) {
     let center = Pos2::new(rect.center().x, rect.center().y - 2.0);
-    let scale = (rect.height() / 31.0).clamp(6.0, 8.2);
+    // Keep the preview comfortably sized inside its panel instead of letting it
+    // dominate the launcher. The slight three-quarter camera angle gives the
+    // model visible depth even before the user drags it.
+    let scale = (rect.height() / 43.0).clamp(4.2, 6.4);
     if let Some(cape_texture) = cape {
         draw_cape(painter, center, scale, yaw, cape_texture);
     }
@@ -352,6 +362,13 @@ fn draw_player(painter: &Painter, rect: Rect, skin: &TextureHandle, cape: Option
         UvRect::new(4.0, 20.0, 4.0, 12.0), UvRect::new(12.0, 20.0, 4.0, 12.0),
         UvRect::new(0.0, 20.0, 4.0, 12.0), UvRect::new(8.0, 20.0, 4.0, 12.0),
         UvRect::new(4.0, 16.0, 4.0, 4.0), UvRect::new(8.0, 16.0, 4.0, 4.0),
+    );
+    // The left leg has its own UV island in modern 64x64 skins. Reusing the
+    // right-leg island made the second leg and its transparent overlay wrong.
+    let left_leg = SkinUv::new(
+        UvRect::new(20.0, 52.0, 4.0, 12.0), UvRect::new(28.0, 52.0, 4.0, 12.0),
+        UvRect::new(16.0, 52.0, 4.0, 12.0), UvRect::new(24.0, 52.0, 4.0, 12.0),
+        UvRect::new(20.0, 48.0, 4.0, 4.0), UvRect::new(24.0, 48.0, 4.0, 4.0),
     );
     let torso = SkinUv::new(
         UvRect::new(20.0, 20.0, 8.0, 12.0), UvRect::new(32.0, 20.0, 8.0, 12.0),
@@ -363,6 +380,11 @@ fn draw_player(painter: &Painter, rect: Rect, skin: &TextureHandle, cape: Option
         UvRect::new(40.0, 20.0, 4.0, 12.0), UvRect::new(48.0, 20.0, 4.0, 12.0),
         UvRect::new(44.0, 16.0, 4.0, 4.0), UvRect::new(48.0, 16.0, 4.0, 4.0),
     );
+    let left_arm = SkinUv::new(
+        UvRect::new(36.0, 52.0, 4.0, 12.0), UvRect::new(44.0, 52.0, 4.0, 12.0),
+        UvRect::new(32.0, 52.0, 4.0, 12.0), UvRect::new(40.0, 52.0, 4.0, 12.0),
+        UvRect::new(36.0, 48.0, 4.0, 4.0), UvRect::new(40.0, 48.0, 4.0, 4.0),
+    );
     let head = SkinUv::new(
         UvRect::new(8.0, 8.0, 8.0, 8.0), UvRect::new(24.0, 8.0, 8.0, 8.0),
         UvRect::new(0.0, 8.0, 8.0, 8.0), UvRect::new(16.0, 8.0, 8.0, 8.0),
@@ -372,6 +394,11 @@ fn draw_player(painter: &Painter, rect: Rect, skin: &TextureHandle, cape: Option
         UvRect::new(4.0, 36.0, 4.0, 12.0), UvRect::new(12.0, 36.0, 4.0, 12.0),
         UvRect::new(0.0, 36.0, 4.0, 12.0), UvRect::new(8.0, 36.0, 4.0, 12.0),
         UvRect::new(4.0, 32.0, 4.0, 4.0), UvRect::new(8.0, 32.0, 4.0, 4.0),
+    );
+    let left_leg_layer = SkinUv::new(
+        UvRect::new(20.0, 36.0, 4.0, 12.0), UvRect::new(28.0, 36.0, 4.0, 12.0),
+        UvRect::new(16.0, 36.0, 4.0, 12.0), UvRect::new(24.0, 36.0, 4.0, 12.0),
+        UvRect::new(20.0, 32.0, 4.0, 4.0), UvRect::new(24.0, 32.0, 4.0, 4.0),
     );
     let torso_layer = SkinUv::new(
         UvRect::new(20.0, 36.0, 8.0, 12.0), UvRect::new(32.0, 36.0, 8.0, 12.0),
@@ -383,54 +410,87 @@ fn draw_player(painter: &Painter, rect: Rect, skin: &TextureHandle, cape: Option
         UvRect::new(40.0, 36.0, 4.0, 12.0), UvRect::new(48.0, 36.0, 4.0, 12.0),
         UvRect::new(44.0, 32.0, 4.0, 4.0), UvRect::new(48.0, 32.0, 4.0, 4.0),
     );
+    let left_arm_layer = SkinUv::new(
+        UvRect::new(52.0, 52.0, 4.0, 12.0), UvRect::new(60.0, 52.0, 4.0, 12.0),
+        UvRect::new(48.0, 52.0, 4.0, 12.0), UvRect::new(56.0, 52.0, 4.0, 12.0),
+        UvRect::new(52.0, 48.0, 4.0, 4.0), UvRect::new(56.0, 48.0, 4.0, 4.0),
+    );
     let head_layer = SkinUv::new(
         UvRect::new(40.0, 8.0, 8.0, 8.0), UvRect::new(56.0, 8.0, 8.0, 8.0),
         UvRect::new(32.0, 8.0, 8.0, 8.0), UvRect::new(48.0, 8.0, 8.0, 8.0),
         UvRect::new(40.0, 0.0, 8.0, 8.0), UvRect::new(48.0, 0.0, 8.0, 8.0),
     );
 
-    draw_box(painter, skin.id(), center, scale, yaw, [-2.0, -5.5, 0.0], [4.0, 12.0, 4.0], leg);
-    draw_box(painter, skin.id(), center, scale, yaw, [2.0, -5.5, 0.0], [4.0, 12.0, 4.0], leg);
-    draw_box(painter, skin.id(), center, scale, yaw, [-2.0, -5.5, 0.0], [4.18, 12.18, 4.18], leg_layer);
-    draw_box(painter, skin.id(), center, scale, yaw, [2.0, -5.5, 0.0], [4.18, 12.18, 4.18], leg_layer);
-    draw_box(painter, skin.id(), center, scale, yaw, [0.0, 1.0, 0.0], [8.0, 12.0, 4.0], torso);
-    draw_box(painter, skin.id(), center, scale, yaw, [0.0, 1.0, 0.0], [8.18, 12.18, 4.18], torso_layer);
-    draw_box(painter, skin.id(), center, scale, yaw, [-6.0, 1.0, 0.0], [4.0, 12.0, 4.0], arm);
-    draw_box(painter, skin.id(), center, scale, yaw, [6.0, 1.0, 0.0], [4.0, 12.0, 4.0], arm);
-    draw_box(painter, skin.id(), center, scale, yaw, [-6.0, 1.0, 0.0], [4.18, 12.18, 4.18], arm_layer);
-    draw_box(painter, skin.id(), center, scale, yaw, [6.0, 1.0, 0.0], [4.18, 12.18, 4.18], arm_layer);
-    draw_box(painter, skin.id(), center, scale, yaw, [0.0, 10.5, 0.0], [8.0, 8.0, 8.0], head);
-    draw_box(painter, skin.id(), center, scale, yaw, [0.0, 10.5, 0.0], [8.28, 8.28, 8.28], head_layer);
+    let mut faces = Vec::with_capacity(72);
+    add_box_faces(&mut faces, center, scale, yaw, [-2.0, -5.5, 0.0], [4.0, 12.0, 4.0], leg);
+    add_box_faces(&mut faces, center, scale, yaw, [2.0, -5.5, 0.0], [4.0, 12.0, 4.0], left_leg);
+    add_box_faces(&mut faces, center, scale, yaw, [-2.0, -5.5, 0.0], [4.18, 12.18, 4.18], leg_layer);
+    add_box_faces(&mut faces, center, scale, yaw, [2.0, -5.5, 0.0], [4.18, 12.18, 4.18], left_leg_layer);
+    add_box_faces(&mut faces, center, scale, yaw, [0.0, 1.0, 0.0], [8.0, 12.0, 4.0], torso);
+    add_box_faces(&mut faces, center, scale, yaw, [0.0, 1.0, 0.0], [8.18, 12.18, 4.18], torso_layer);
+    add_box_faces(&mut faces, center, scale, yaw, [-6.0, 1.0, 0.0], [4.0, 12.0, 4.0], arm);
+    add_box_faces(&mut faces, center, scale, yaw, [6.0, 1.0, 0.0], [4.0, 12.0, 4.0], left_arm);
+    add_box_faces(&mut faces, center, scale, yaw, [-6.0, 1.0, 0.0], [4.18, 12.18, 4.18], arm_layer);
+    add_box_faces(&mut faces, center, scale, yaw, [6.0, 1.0, 0.0], [4.18, 12.18, 4.18], left_arm_layer);
+    add_box_faces(&mut faces, center, scale, yaw, [0.0, 10.5, 0.0], [8.0, 8.0, 8.0], head);
+    add_box_faces(&mut faces, center, scale, yaw, [0.0, 10.5, 0.0], [8.28, 8.28, 8.28], head_layer);
+
+    // Sort all cuboid faces together by camera depth. This lets the far arm/leg
+    // sit behind the torso while the near-side geometry naturally occludes it.
+    faces.sort_by(|a, b| a.depth.total_cmp(&b.depth));
+    for face in faces {
+        paint_uv_face(painter, skin.id(), face.points, face.uv);
+    }
 }
 
-fn draw_cape(painter: &Painter, center: Pos2, scale: f32, yaw: f32, texture: &TextureHandle) {
-    let corners = [
-        project(center, scale, yaw, [-5.0, 7.0, -2.4]),
-        project(center, scale, yaw, [5.0, 7.0, -2.4]),
-        project(center, scale, yaw, [5.0, -6.0, -2.4]),
-        project(center, scale, yaw, [-5.0, -6.0, -2.4]),
-    ];
-    let uv = [Pos2::new(0.0, 0.0), Pos2::new(1.0, 0.0), Pos2::new(1.0, 1.0), Pos2::new(0.0, 1.0)];
-    paint_quad(painter, texture.id(), corners, uv);
-}
-
-fn draw_box(painter: &Painter, texture: egui::TextureId, origin: Pos2, scale: f32, yaw: f32, center: [f32; 3], size: [f32; 3], uv: SkinUv) {
+fn add_box_faces(
+    faces: &mut Vec<RenderFace>,
+    origin: Pos2,
+    scale: f32,
+    yaw: f32,
+    center: [f32; 3],
+    size: [f32; 3],
+    uv: SkinUv,
+) {
     let [hx, hy, hz] = [size[0] / 2.0, size[1] / 2.0, size[2] / 2.0];
-    let point = |x: f32, y: f32, z: f32| project(origin, scale, yaw, [center[0] + x, center[1] + y, center[2] + z]);
-    let front = [point(-hx, hy, hz), point(hx, hy, hz), point(hx, -hy, hz), point(-hx, -hy, hz)];
-    let back = [point(hx, hy, -hz), point(-hx, hy, -hz), point(-hx, -hy, -hz), point(hx, -hy, -hz)];
-    let right = [point(hx, hy, hz), point(hx, hy, -hz), point(hx, -hy, -hz), point(hx, -hy, hz)];
-    let left = [point(-hx, hy, -hz), point(-hx, hy, hz), point(-hx, -hy, hz), point(-hx, -hy, -hz)];
-    let top = [point(-hx, hy, -hz), point(hx, hy, -hz), point(hx, hy, hz), point(-hx, hy, hz)];
-    let face = if yaw.cos() >= 0.0 { (front, uv.front) } else { (back, uv.back) };
-    paint_uv_face(painter, texture, face.0, face.1);
-    let side = if yaw.sin() >= 0.0 { (right, uv.right) } else { (left, uv.left) };
-    paint_uv_face(painter, texture, side.0, side.1);
-    paint_uv_face(painter, texture, top, uv.top);
+    let vertices = [
+        [-hx, hy, hz], [hx, hy, hz], [hx, -hy, hz], [-hx, -hy, hz],
+        [hx, hy, -hz], [-hx, hy, -hz], [-hx, -hy, -hz], [hx, -hy, -hz],
+    ];
+    let projected = vertices.map(|point| {
+        project(origin, scale, yaw, [center[0] + point[0], center[1] + point[1], center[2] + point[2]])
+    });
+    let camera_yaw = yaw + 0.48;
+    let (sin, cos) = camera_yaw.sin_cos();
+    let depth = |indices: [usize; 4]| {
+        indices.iter().map(|index| {
+            let point = vertices[*index];
+            -(center[0] + point[0]) * sin + (center[2] + point[2]) * cos
+        }).sum::<f32>() / 4.0
+    };
+    let faces = [
+        ([0, 1, 2, 3], uv.front),
+        ([4, 5, 6, 7], uv.back),
+        ([1, 4, 7, 2], uv.right),
+        ([5, 0, 3, 6], uv.left),
+        ([5, 4, 1, 0], uv.top),
+        ([3, 2, 7, 6], uv.bottom),
+    ];
+    for (indices, face_uv) in faces {
+        faces_push(faces, RenderFace {
+            depth: depth(indices),
+            points: indices.map(|index| projected[index]),
+            uv: face_uv,
+        });
+    }
+}
+
+fn faces_push(target: &mut Vec<RenderFace>, face: RenderFace) {
+    target.push(face);
 }
 
 fn project(origin: Pos2, scale: f32, yaw: f32, point: [f32; 3]) -> Pos2 {
-    let (sin, cos) = yaw.sin_cos();
+    let (sin, cos) = (yaw + 0.48).sin_cos();
     let x = point[0] * cos + point[2] * sin;
     let z = -point[0] * sin + point[2] * cos;
     Pos2::new(origin.x + x * scale, origin.y - point[1] * scale + z * scale * 0.28)
