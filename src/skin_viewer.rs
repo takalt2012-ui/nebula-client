@@ -123,8 +123,8 @@ impl SkinViewer {
         }
 
         let preview = Rect::from_center_size(
-            Pos2::new(screen.left() + 190.0, screen.center().y + 20.0),
-            Vec2::new(240.0, 286.0),
+            Pos2::new(screen.left() + screen.width() * 0.27, screen.center().y + 12.0),
+            Vec2::new(190.0, 250.0),
         );
         let response = ui.interact(preview, egui::Id::new("immersive_skin_drag"), Sense::drag())
             .on_hover_text("Hold and drag to rotate your skin");
