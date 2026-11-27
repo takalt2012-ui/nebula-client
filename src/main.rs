@@ -1841,6 +1841,9 @@ fn main() -> eframe::Result<()> {
 
 fn load_immersive_background(ctx: &Context) -> Option<egui::TextureHandle> {
     let image = image::load_from_memory(include_bytes!("../assets/immersive-bc-forest.png")).ok()?.to_rgba8();
+    // A restrained unsharp mask restores edge definition after cover-fit scaling.
+    // Keep linear texture filtering; nearest-neighbour would make the photo jagged.
+    let image = image::imageops::unsharpen(&image, 1.15, 3);
     let size = [image.width() as usize, image.height() as usize];
     Some(ctx.load_texture("nebula-immersive-bc-forest", egui::ColorImage::from_rgba_unmultiplied(size, image.as_raw()), egui::TextureOptions::LINEAR))
 }
