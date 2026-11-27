@@ -159,3 +159,18 @@ Please:
 - Ensure transparent pixels reveal the underlying base skin, while opaque pixels in the outer layer remain visible.
 - Check alpha blending and texture format/color handling in the skin preview path. Do not simply force all outer-layer pixels opaque or hide the outer layer.
 - Test a skin with visibly semi-transparent/transparent outer-layer pixels and compare it against the original PNG.
+
+
+## Implementation pushed by ChatGPT — 2026-11-27
+
+Claude's usage was exhausted, so the following focused changes were made directly on `nebula-redesign` through GitHub. They are pushed commits; the user can pull them normally.
+
+- Skin viewer: corrected modern 64x64 left-arm and left-leg UV islands, including their outer-layer UVs. Previously both sides reused right-limb UVs, which could sample the wrong transparent overlay regions.
+- Skin viewer: now gathers faces across the model and sorts by camera depth, rather than drawing each body part in a fixed order. Added a fixed three-quarter camera angle and reduced/anchored the preview.
+- Skin texture upload: retains RGBA alpha using `ColorImage::from_rgba_unmultiplied`; transparent overlay pixels are not flattened.
+- Background: applied a restrained image unsharp mask (`imageops::unsharpen`) to the Immersive forest image at load time, and reduced the non-Legacy green wash opacity from 110 to 68. The original sunset asset and Legacy UI were not changed.
+- Account pill: remains a clickable control even with one account; clicking refreshes the account list instead of behaving like a dead badge.
+
+Commits in this change sequence include `a23b793`, `fafbf8b`, `6f1e83b`, `0313fd2`, `24cc6fc`, `b9310fe`, and `720536b`.
+
+**Not verified locally:** This environment cannot clone/build the repository or run the launcher. Please run `cargo build --release` and inspect a fresh screenshot. Confirm the player model, alpha overlays, background sharpness, and account pill before making a release. The renderer remains a custom projected egui model; this change improves UV correctness and face ordering but is not a GPU depth-buffered 3D renderer.
