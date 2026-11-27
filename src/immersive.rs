@@ -86,7 +86,7 @@ fn round_button(
     let fill = if active {
         themed(139, 91, 249, 190)
     } else {
-        Color32::from_rgba_unmultiplied(14, 10, 30, (150.0 + 50.0 * hover) as u8)
+        themed(14, 10, 30, (150.0 + 50.0 * hover) as u8)
     };
     let button_rect = rect.shrink(0.5);
     let corner = egui::CornerRadius::same(9);

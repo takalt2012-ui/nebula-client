@@ -25,20 +25,20 @@ pub(crate) struct Palette {
 }
 
 pub(crate) const GREEN: Palette = Palette {
-    background: Color32::from_rgb(9, 7, 22),
-    sidebar: Color32::from_rgb(15, 12, 30),
-    surface: Color32::from_rgb(25, 19, 43),
-    surface_raised: Color32::from_rgb(37, 29, 60),
-    border: Color32::from_rgb(54, 43, 78),
-    text: Color32::from_rgb(244, 240, 255),
-    muted: Color32::from_rgb(187, 179, 211),
-    purple: Color32::from_rgb(103, 66, 220),
-    purple_bright: Color32::from_rgb(190, 166, 255),
-    success: Color32::from_rgb(154, 222, 169),
-    danger: Color32::from_rgb(255, 177, 188),
-    violet: Color32::from_rgb(119, 83, 229),
-    coral: Color32::from_rgb(226, 126, 111),
-    coral_text: Color32::from_rgb(255, 177, 151),
+    background: Color32::from_rgb(5, 31, 32),
+    sidebar: Color32::from_rgb(11, 43, 38),
+    surface: Color32::from_rgb(22, 56, 50),
+    surface_raised: Color32::from_rgb(35, 83, 71),
+    border: Color32::from_rgb(35, 83, 71),
+    text: Color32::from_rgb(218, 241, 222),
+    muted: Color32::from_rgb(176, 211, 186),
+    purple: Color32::from_rgb(35, 83, 71),
+    purple_bright: Color32::from_rgb(142, 182, 155),
+    success: Color32::from_rgb(146, 226, 160),
+    danger: Color32::from_rgb(255, 186, 198),
+    violet: Color32::from_rgb(35, 83, 71),
+    coral: Color32::from_rgb(142, 182, 155),
+    coral_text: Color32::from_rgb(176, 211, 186),
 };
 
 pub(crate) const LEGACY: Palette = Palette {
@@ -82,20 +82,21 @@ pub(crate) fn with_alpha(color: Color32, alpha: u8) -> Color32 {
 /// Translates older palette literals into the modern palette; neutral colours pass through.
 fn modern_of(rgb: (u8, u8, u8)) -> (u8, u8, u8) {
     match rgb {
-        (139, 91, 249) | (143, 92, 255) | (75, 48, 119) => (103, 66, 220),
-        (115, 69, 176) | (46, 29, 72) | (52, 36, 82) => (25, 19, 43),
-        (146, 96, 224) | (112, 70, 228) | (98, 60, 205) => (103, 66, 220),
+        (139, 91, 249) | (143, 92, 255) | (75, 48, 119) => (35, 83, 71),
+        (115, 69, 176) | (46, 29, 72) | (52, 36, 82) => (22, 56, 50),
+        (146, 96, 224) | (112, 70, 228) | (98, 60, 205) => (35, 83, 71),
         (225, 205, 255) | (204, 174, 255) | (205, 173, 255) | (214, 190, 255)
-        | (190, 158, 255) | (198, 168, 255) => (190, 166, 255),
+        | (190, 158, 255) | (198, 168, 255) => (142, 182, 155),
         (16, 11, 36) | (17, 15, 34) | (26, 18, 48) | (19, 15, 33)
         | (14, 10, 30) | (54, 49, 68) | (52, 46, 76) | (22, 15, 46)
-        | (8, 5, 22) => (15, 12, 30),
-        (10, 7, 24) | (9, 7, 25) => (9, 7, 22),
-        (214, 207, 232) | (226, 220, 242) | (190, 183, 212) => (187, 179, 211),
-        (78, 66, 112) | (70, 58, 108) => (37, 29, 60),
+        | (8, 5, 22) => (11, 43, 38),
+        (10, 7, 24) | (9, 7, 25) => (5, 31, 32),
+        (214, 207, 232) | (226, 220, 242) | (190, 183, 212) => (176, 211, 186),
+        (78, 66, 112) | (70, 58, 108) => (35, 83, 71),
         other => other,
     }
 }
+
 /// A Legacy palette tint translated to the modern palette when Legacy mode is inactive.
 pub(crate) fn themed(r: u8, g: u8, b: u8, alpha: u8) -> Color32 {
     let (r, g, b) = if legacy_look() { (r, g, b) } else { modern_of((r, g, b)) };

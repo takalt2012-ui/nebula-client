@@ -448,11 +448,11 @@ pub(crate) fn dropdown_row(ui: &mut egui::Ui, text: &str, selected: bool, highli
         painter.rect_filled(inner, radius, Color32::from_white_alpha(((1.0 - hl) * 12.0) as u8));
     }
     if hl > 0.0 {
-        painter.rect_filled(inner, radius, Color32::from_rgba_unmultiplied(139, 91, 249, (hl * 84.0) as u8));
+        painter.rect_filled(inner, radius, themed(139, 91, 249, (hl * 84.0) as u8));
         painter.rect_stroke(
             inner,
             radius,
-            Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(214, 190, 255, (hl * 72.0) as u8)),
+            Stroke::new(1.0_f32, themed(214, 190, 255, (hl * 72.0) as u8)),
             egui::StrokeKind::Inside,
         );
         painter.rect_filled(
