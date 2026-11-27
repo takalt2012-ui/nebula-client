@@ -190,6 +190,7 @@ impl NebulaClient {
         let name = self.selected_account().map(|account| account.name.as_str());
         let can_switch = self.accounts.len() > 1;
         let mut switch = false;
+        let mut refresh_accounts = false;
         let mut sign_in = false;
         let mut open = None;
         ui.scope_builder(UiBuilder::new().max_rect(area).layout(Layout::top_down(Align::Max)), |ui| {
@@ -198,6 +199,7 @@ impl NebulaClient {
                 let clicked = account_control(ui, name, can_switch);
                 if name.is_some() {
                     switch = clicked && can_switch;
+                    refresh_accounts = clicked && !can_switch;
                 } else {
                     sign_in = clicked;
                 }
@@ -215,7 +217,7 @@ impl NebulaClient {
             self.selected_account = Some(next);
             self.persist_selection();
         }
-        if sign_in {
+        if sign_in || refresh_accounts {
             self.load_accounts();
         }
         if let Some(page) = open {
