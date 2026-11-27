@@ -134,8 +134,8 @@ impl NebulaClient {
                 };
                 let painter = ctx.layer_painter(egui::LayerId::background());
                 painter.image(texture.id(), screen, uv, background_tint);
-                // Deep-green wash so the photo sits inside the palette and text stays readable.
-                painter.rect_filled(screen, 0.0, with_alpha(pal().background, 110));
+                // A lighter palette wash keeps text legible without muddying the photo.
+                painter.rect_filled(screen, 0.0, with_alpha(pal().background, 68));
             }
         }
         if ctx.input(|input| input.key_pressed(egui::Key::Escape)) && self.page != Page::Play {
