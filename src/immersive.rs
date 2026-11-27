@@ -162,7 +162,9 @@ impl NebulaClient {
             let rect = ui.max_rect();
             self.immersive_brand(ui, rect);
             let account_uuid = self.selected_account.and_then(|index| self.accounts.get(index)).map(|account| account.uuid.as_str());
-            self.skin_viewer.show(ui, rect, account_uuid);
+            if self.settings.show_skin_preview {
+                self.skin_viewer.show(ui, rect, account_uuid);
+            }
             self.immersive_account(ui, rect);
             self.immersive_dock(ui, ctx, rect);
         });

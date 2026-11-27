@@ -81,6 +81,8 @@ pub(crate) struct SkinViewer {
     skin_texture: Option<TextureHandle>,
     cape_texture: Option<TextureHandle>,
     load_error: Option<String>,
+    /// The account is fine but has no custom skin, so Mojang serves the default one.
+    default_skin: bool,
     yaw: f32,
 }
 
@@ -91,6 +93,7 @@ impl SkinViewer {
             self.skin_texture = None;
             self.cape_texture = None;
             self.load_error = None;
+            self.default_skin = false;
             self.receiver = uuid.map(request_skin);
         }
 
@@ -105,6 +108,7 @@ impl SkinViewer {
                 self.receiver = None;
             }
             Some(Ok(Err(error))) => {
+                self.default_skin = matches!(error, SkinError::SkinMissing);
                 self.load_error = Some(error.to_string());
                 self.receiver = None;
             }
@@ -116,7 +120,7 @@ impl SkinViewer {
         }
 
         let preview = Rect::from_center_size(
-            Pos2::new(screen.center().x, screen.center().y + 56.0),
+            Pos2::new(screen.left() + 190.0, screen.center().y + 20.0),
             Vec2::new(240.0, 286.0),
         );
         let response = ui.interact(preview, egui::Id::new("immersive_skin_drag"), Sense::drag())
@@ -137,6 +141,8 @@ impl SkinViewer {
         } else {
             let label = if uuid.is_none() {
                 "Sign in to preview your skin"
+            } else if self.default_skin {
+                "Default skin"
             } else if self.load_error.is_some() {
                 "Skin preview unavailable"
             } else {
@@ -149,7 +155,15 @@ impl SkinViewer {
                 egui::FontId::proportional(13.0),
                 Color32::from_white_alpha(190),
             );
-            if let Some(reason) = self.load_error.as_deref() {
+            if self.default_skin {
+                ui.painter().text(
+                    preview.center() + Vec2::new(0.0, 22.0),
+                    egui::Align2::CENTER_CENTER,
+                    "This account has no custom skin yet.",
+                    egui::FontId::proportional(11.0),
+                    Color32::from_white_alpha(150),
+                );
+            } else if let Some(reason) = self.load_error.as_deref() {
                 ui.painter().text(
                     preview.center() + Vec2::new(0.0, 22.0),
                     egui::Align2::CENTER_CENTER,

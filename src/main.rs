@@ -136,6 +136,8 @@ struct LauncherSettings {
     close_after_launch: bool,
     /// Restores the original sunset and its vintage violet/coral treatment.
     legacy_look: bool,
+    /// Immersive only: shows the player skin preview on the left.
+    show_skin_preview: bool,
     opengl_threading: bool,
     nvidia_threading: bool,
     selected_version: Option<String>,
@@ -154,6 +156,7 @@ impl Default for LauncherSettings {
             io_priority: true,
             close_after_launch: true,
             legacy_look: false,
+            show_skin_preview: true,
             opengl_threading: false,
             nvidia_threading: false,
             selected_version: None,
@@ -1563,6 +1566,18 @@ impl NebulaClient {
             self.settings.legacy_look = legacy;
             set_legacy_look(legacy);
             configure_egui(ui.ctx());
+            self.persist_selection();
+        }
+        ui.add_space(8.0);
+        let mut preview = self.settings.show_skin_preview;
+        if setting_row(
+            ui,
+            &mut preview,
+            "Skin preview",
+            "Immersive only: shows your player skin on the left of the home screen.",
+            true,
+        ) {
+            self.settings.show_skin_preview = preview;
             self.persist_selection();
         }
         let picked = choice_row(
