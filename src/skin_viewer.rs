@@ -468,7 +468,7 @@ fn add_box_faces(
             -(center[0] + point[0]) * sin + (center[2] + point[2]) * cos
         }).sum::<f32>() / 4.0
     };
-    let faces = [
+    let face_defs = [
         ([0, 1, 2, 3], uv.front),
         ([4, 5, 6, 7], uv.back),
         ([1, 4, 7, 2], uv.right),
@@ -476,17 +476,13 @@ fn add_box_faces(
         ([5, 4, 1, 0], uv.top),
         ([3, 2, 7, 6], uv.bottom),
     ];
-    for (indices, face_uv) in faces {
-        faces_push(faces, RenderFace {
+    for (indices, face_uv) in face_defs {
+        faces.push(RenderFace {
             depth: depth(indices),
             points: indices.map(|index| projected[index]),
             uv: face_uv,
         });
     }
-}
-
-fn faces_push(target: &mut Vec<RenderFace>, face: RenderFace) {
-    target.push(face);
 }
 
 fn project(origin: Pos2, scale: f32, yaw: f32, point: [f32; 3]) -> Pos2 {
