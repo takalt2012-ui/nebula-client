@@ -169,6 +169,8 @@ impl NebulaClient {
         shadowed_text(painter, Pos2::new(x, top + 78.0), "NEBULA", &name, pal().text, 14.0);
         let sub = FontId::new(13.0, semibold());
         shadowed_text(painter, Pos2::new(x, top + 118.0), "CLIENT", &sub, pal().coral_text, 11.0);
+        let slogan = FontId::new(20.0, serif());
+        shadowed_text(painter, Pos2::new(x, top + 158.0), "Beautiful, and simple.", &slogan, pal().text, 0.0);
     }
 
     fn immersive_account(&mut self, ui: &mut egui::Ui, rect: Rect) {

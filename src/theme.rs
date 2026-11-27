@@ -121,6 +121,11 @@ pub(crate) fn semibold() -> FontFamily {
     FontFamily::Name("Horizon Geist SemiBold".into())
 }
 
+/// Playfair Display Italic, used only for the slogan and large display text.
+pub(crate) fn serif() -> FontFamily {
+    FontFamily::Name("Nebula Serif".into())
+}
+
 pub(crate) fn configure_egui(ctx: &Context) {
     let mut fonts = egui::FontDefinitions::default();
     fonts.font_data.insert(
@@ -155,6 +160,11 @@ pub(crate) fn configure_egui(ctx: &Context) {
         with_fallbacks.insert(0, name.into());
         fonts.families.insert(family, with_fallbacks);
     }
+    fonts.font_data.insert(
+        "Nebula Serif".into(),
+        std::sync::Arc::new(egui::FontData::from_static(include_bytes!("../assets/fonts/PlayfairDisplay-Italic.ttf"))),
+    );
+    fonts.families.insert(serif(), vec!["Nebula Serif".into(), "Horizon Geist".into()]);
     ctx.set_fonts(fonts);
     let mut style = (*ctx.style()).clone();
     style.visuals = egui::Visuals::dark();
