@@ -121,12 +121,21 @@ impl NebulaClient {
                 } else {
                     Color32::WHITE
                 };
-                ctx.layer_painter(egui::LayerId::background()).image(
-                    texture.id(),
-                    screen,
-                    Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
-                    background_tint,
-                );
+                // Cover-fit: fill the window and crop the overflow instead of stretching the photo.
+                let [tw, th] = texture.size();
+                let image_aspect = tw as f32 / th.max(1) as f32;
+                let screen_aspect = screen.width() / screen.height().max(1.0);
+                let uv = if screen_aspect > image_aspect {
+                    let visible = image_aspect / screen_aspect;
+                    Rect::from_min_max(Pos2::new(0.0, (1.0 - visible) / 2.0), Pos2::new(1.0, (1.0 + visible) / 2.0))
+                } else {
+                    let visible = screen_aspect / image_aspect;
+                    Rect::from_min_max(Pos2::new((1.0 - visible) / 2.0, 0.0), Pos2::new((1.0 + visible) / 2.0, 1.0))
+                };
+                let painter = ctx.layer_painter(egui::LayerId::background());
+                painter.image(texture.id(), screen, uv, background_tint);
+                // Deep-green wash so the photo sits inside the palette and text stays readable.
+                painter.rect_filled(screen, 0.0, with_alpha(pal().background, 110));
             }
         }
         if ctx.input(|input| input.key_pressed(egui::Key::Escape)) && self.page != Page::Play {

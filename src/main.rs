@@ -1825,9 +1825,9 @@ fn main() -> eframe::Result<()> {
 
 
 fn load_immersive_background(ctx: &Context) -> Option<egui::TextureHandle> {
-    let image = image::load_from_memory(include_bytes!("../assets/immersive-voxel.png")).ok()?.to_rgba8();
+    let image = image::load_from_memory(include_bytes!("../assets/immersive-bc-forest.png")).ok()?.to_rgba8();
     let size = [image.width() as usize, image.height() as usize];
-    Some(ctx.load_texture("nebula-immersive-voxel-landscape", egui::ColorImage::from_rgba_unmultiplied(size, image.as_raw()), egui::TextureOptions::LINEAR))
+    Some(ctx.load_texture("nebula-immersive-bc-forest", egui::ColorImage::from_rgba_unmultiplied(size, image.as_raw()), egui::TextureOptions::LINEAR))
 }
 
 fn load_horizon_logo(ctx: &Context) -> Option<egui::TextureHandle> {
