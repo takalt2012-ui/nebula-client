@@ -375,9 +375,11 @@ fn account_control(ui: &mut egui::Ui, name: Option<&str>, interactive: bool) -> 
     let avatar = 34.0;
     let chevron = if signed_in && interactive { 22.0 } else { 0.0 };
     let width = 8.0 + avatar + 10.0 + text_width + 16.0 + chevron;
-    let sense = if interactive || !signed_in { Sense::click() } else { Sense::hover() };
+    // Keep this a real control even with a single account. In that state it
+    // refreshes the account list rather than becoming a dead, non-hoverable badge.
+    let sense = Sense::click();
     let (rect, response) = ui.allocate_exact_size(Vec2::new(width, 46.0), sense);
-    let live = sense == Sense::click();
+    let live = true;
     let hover = ui.ctx().animate_bool_with_time(response.id.with("hover"), live && response.hovered(), 0.12);
     let pressed = live && response.is_pointer_button_down_on();
     let painter = ui.painter();
@@ -414,6 +416,12 @@ fn account_control(ui: &mut egui::Ui, name: Option<&str>, interactive: bool) -> 
     if !live {
         return false;
     }
-    let tip = if signed_in { "Switch account" } else { "Sign in with your Microsoft account" };
+    let tip = if signed_in && interactive {
+        "Switch account"
+    } else if signed_in {
+        "Refresh account list"
+    } else {
+        "Sign in with your Microsoft account"
+    };
     response.on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(tip).clicked()
 }
