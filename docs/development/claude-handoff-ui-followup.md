@@ -147,3 +147,15 @@ The latest branch tip observed during review was `4a3844a` (skin metadata/URL fi
 - [ ] Immersive UI polish takes inspiration from launcher UX patterns without copying MinecraftX.
 - [ ] Classic and Legacy UI are unchanged.
 - [ ] Build/run and inspect a fresh screenshot/video; report exact commits and what was verified.
+
+
+### Additional skin issue — outer layer transparency
+
+The user adds that their Minecraft skin's **outer layer is transparent**. Treat this as a separate rendering bug/requirement, not as an intentionally invisible layer.
+
+Please:
+- Preserve the skin PNG's alpha channel when decoding/loading and uploading/drawing the texture; do not flatten it onto an opaque background or discard alpha.
+- Render the second-layer overlay parts (hat, jacket, sleeves, pants) with their intended transparent pixels and correct slight outward offset to avoid z-fighting.
+- Ensure transparent pixels reveal the underlying base skin, while opaque pixels in the outer layer remain visible.
+- Check alpha blending and texture format/color handling in the skin preview path. Do not simply force all outer-layer pixels opaque or hide the outer layer.
+- Test a skin with visibly semi-transparent/transparent outer-layer pixels and compare it against the original PNG.
