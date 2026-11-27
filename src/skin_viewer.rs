@@ -304,6 +304,8 @@ fn decode_base64(input: &str) -> Option<Vec<u8>> {
 fn texture_from_bytes(ctx: &Context, name: &str, bytes: &[u8]) -> Option<TextureHandle> {
     let image = image::load_from_memory(bytes).ok()?.to_rgba8();
     let size = [image.width() as usize, image.height() as usize];
+    // Preserve the PNG alpha channel. Transparent outer-layer texels must
+    // reveal the base skin underneath; never flatten this texture.
     Some(ctx.load_texture(
         name,
         egui::ColorImage::from_rgba_unmultiplied(size, image.as_raw()),
