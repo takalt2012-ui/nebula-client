@@ -60,7 +60,10 @@ struct TexturePayload {
 
 #[derive(Deserialize)]
 struct TextureSet {
+    // Mojang writes these keys in upper case; serde is case-sensitive.
+    #[serde(rename = "SKIN")]
     skin: Option<TextureLocation>,
+    #[serde(rename = "CAPE")]
     cape: Option<TextureLocation>,
 }
 
@@ -231,12 +234,14 @@ fn fetch_skin(uuid: &str) -> Result<SkinBytes, SkinError> {
         .map(|property| property.value.as_str()).ok_or(SkinError::InvalidProfile)?;
     let decoded = decode_base64(encoded).ok_or(SkinError::InvalidProfile)?;
     let payload: TexturePayload = serde_json::from_slice(&decoded).map_err(|_| SkinError::InvalidProfile)?;
-    let skin_url = payload.textures.skin.map(|texture| texture.url).ok_or(SkinError::SkinMissing)?;
+    // Mojang lists texture links as http://; the files are served over https too.
+    let secure = |url: String| url.replacen("http://", "https://", 1);
+    let skin_url = payload.textures.skin.map(|texture| secure(texture.url)).ok_or(SkinError::SkinMissing)?;
     if !skin_url.starts_with("https://textures.minecraft.net/texture/") {
         return Err(SkinError::InvalidProfile);
     }
     let skin = curl_get(&skin_url)?;
-    let cape = match payload.textures.cape.map(|texture| texture.url) {
+    let cape = match payload.textures.cape.map(|texture| secure(texture.url)) {
         Some(url) if url.starts_with("https://textures.minecraft.net/texture/") => Some(curl_get(&url)?),
         _ => None,
     };
